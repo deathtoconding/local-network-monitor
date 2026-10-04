@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from datetime import datetime, timezone
 
 import psutil
@@ -285,7 +286,8 @@ class TestProcessResolver:
         assert not info.resolved
 
     def test_process_that_exits_between_steps(self):
-        process = subprocess.Popen(["sleep", "0.05"])
+        # sys.executable keeps this cross-platform: Windows has no `sleep` binary.
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.05)"])
         pid = process.pid
         process.wait()
         info = ProcessResolver().resolve(pid)

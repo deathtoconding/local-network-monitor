@@ -93,8 +93,14 @@ class TestStorageFailures:
         with pytest.raises(sqlite3.DatabaseError):
             build_state(config, with_notifications=False)
 
-        # Recovery path used by the runbook.
-        database_path.unlink()
+        # Recovery path used by the runbook: move the file aside. WAL companions
+        # are removed too, otherwise a stale -wal would be replayed on the next
+        # start. build_state() must already have released its handle here, which
+        # is why this step also works on Windows.
+        for suffix in ("", "-wal", "-shm"):
+            candidate = Path(f"{database_path}{suffix}")
+            if candidate.exists():
+                candidate.unlink()
         recovered = build_state(config, with_notifications=False)
         assert recovered.database.table_counts()["events"] == 0
         recovered.database.close()

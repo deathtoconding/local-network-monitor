@@ -26,6 +26,9 @@ Public API = the REST endpoints and the configuration file.
   CodeQL, Dependabot, and a tag-driven release workflow that attaches artifacts.
 - **Developer tooling**: `Makefile`, `scripts/dev.ps1`, `scripts/dev.sh`,
   `.pre-commit-config.yaml`, issue/PR templates, `CODEOWNERS`.
+- **Tests**: a suite that runs unchanged on Windows and Linux; the only
+  platform-specific behaviour is injected through `platform_name=` rather
+  than monkeypatching `sys.platform`.
 - **Tests**: `test_config.py`, `test_observability.py`, `test_cli.py`,
   `test_notifications.py`, `test_fault_injection.py` (247 tests, 88 % coverage;
   CI fails below 85 %).
@@ -41,6 +44,10 @@ Public API = the REST endpoints and the configuration file.
 
 ### Fixed
 
+- A failed start against a corrupt database left its SQLite connection open,
+  which on Windows blocked the documented recovery step of moving the file
+  aside. `Database.connect()` and `build_state()` now release what they
+  opened before re-raising, so the failure stays loud without holding a lock.
 - The system collector ran only on the first cycle, so its `last_success` went
   stale and produced `COLLECTOR_FAILURE` events every 15 s on a healthy monitor.
 - Connection snapshots were written every cycle even when unchanged; they are now

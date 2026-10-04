@@ -276,36 +276,45 @@ class MonitorState:
 
 
 def build_state(config: Config, *, with_notifications: bool = True) -> MonitorState:
-    """Create a :class:`MonitorState` from a configuration object."""
+    """Create a :class:`MonitorState` from a configuration object.
+
+    The database is opened first and closed again if any later step fails, so a
+    failed startup never holds the file open - that is what makes the "move the
+    corrupt file aside" recovery in docs/RUNBOOK.md work on Windows.
+    """
     database = Database(config.database.path_obj)
-    database.connect()
+    try:
+        database.connect()
 
-    health_repository = CollectorHealthRepository(database)
-    health = CollectorHealthRegistry()
-    # Restore the last known health from disk so /api/status is informative
-    # immediately after a restart.
-    for name, status in health_repository.load().items():
-        health.statuses[name] = status
+        health_repository = CollectorHealthRepository(database)
+        health = CollectorHealthRegistry()
+        # Restore the last known health from disk so /api/status is informative
+        # immediately after a restart.
+        for name, status in health_repository.load().items():
+            health.statuses[name] = status
 
-    notifications: Optional[NotificationManager] = None
-    if with_notifications:
-        from ..notifications import EmailNotifier
+        notifications: Optional[NotificationManager] = None
+        if with_notifications:
+            from ..notifications import EmailNotifier
 
-        notifiers = [EmailNotifier(config.notifications.email)]
-        notifications = NotificationManager(config.notifications, notifiers=notifiers)
+            notifiers = [EmailNotifier(config.notifications.email)]
+            notifications = NotificationManager(config.notifications, notifiers=notifiers)
 
-    return MonitorState(
-        config=config,
-        database=database,
-        measurements=InterfaceMeasurementRepository(database),
-        connections=ConnectionRepository(database),
-        processes=ProcessRepository(database),
-        events=EventRepository(database),
-        health=health,
-        detection=DetectionEngine(config.detection),
-        notifications=notifications,
-        health_repository=health_repository,
-    )
+        return MonitorState(
+            config=config,
+            database=database,
+            measurements=InterfaceMeasurementRepository(database),
+            connections=ConnectionRepository(database),
+            processes=ProcessRepository(database),
+            events=EventRepository(database),
+            health=health,
+            detection=DetectionEngine(config.detection),
+            notifications=notifications,
+            health_repository=health_repository,
+        )
+    except Exception:
+        database.close()
+        raise
 
 
 def empty_state(config: Optional[Config] = None) -> MonitorState:

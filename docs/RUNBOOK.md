@@ -144,6 +144,10 @@ to run against data it cannot trust.
 
 **Preserve, then recover**
 
+The monitor has already exited by the time you see this error, and a failed
+start releases the database handle (`Database.connect()` closes what it
+opened), so the file is not held open even on Windows.
+
 ```powershell
 # 1. Preserve everything, always, before touching anything
 Copy-Item data\monitor.db   "data\monitor.corrupt-$(Get-Date -Format yyyyMMdd-HHmmss).db"

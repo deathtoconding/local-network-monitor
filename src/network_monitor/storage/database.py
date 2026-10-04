@@ -49,11 +49,19 @@ class Database:
                 isolation_level=None,  # explicit transaction control
             )
             connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA journal_mode=WAL")
-            connection.execute("PRAGMA synchronous=NORMAL")
-            connection.execute("PRAGMA foreign_keys=ON")
-            self._connection = connection
-            self._create_schema(connection)
+            try:
+                connection.execute("PRAGMA journal_mode=WAL")
+                connection.execute("PRAGMA synchronous=NORMAL")
+                connection.execute("PRAGMA foreign_keys=ON")
+                self._connection = connection
+                self._create_schema(connection)
+            except Exception:
+                # A corrupt or unreadable file must not leave a half-open handle
+                # behind: on Windows an open handle blocks the recovery step
+                # (moving the file aside) that the runbook prescribes.
+                self._connection = None
+                connection.close()
+                raise
             logger.info("database ready at %s (schema v%d)", self.path, SCHEMA_VERSION)
             return connection
 
