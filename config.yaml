@@ -1,0 +1,81 @@
+# Local Network Monitor - default configuration.
+#
+# Every value below has a built-in default in src/network_monitor/config.py;
+# this file only overrides them. Copy to config.local.yaml (git-ignored) for
+# machine-specific settings and run with:
+#
+#     python -m network_monitor --config config.local.yaml
+
+monitor:
+  # Seconds between collection cycles. 1.0 is the recommended minimum:
+  # Windows performance counters are not designed for faster polling.
+  collection_interval: 1.0
+  # Bind address for the local web dashboard. Keep it on the loopback
+  # interface so the API is never exposed to the local network.
+  host: 127.0.0.1
+  port: 8000
+  # Interfaces that are ignored by default (loopback traffic is noise here).
+  exclude_interfaces:
+    - "Loopback Pseudo-Interface 1"
+    - lo
+
+database:
+  path: data/monitor.db
+  # Measurements and events older than this are pruned periodically.
+  # 0 disables pruning.
+  retention_days: 7
+  # Connection snapshots are much more numerous than measurements, so they get
+  # a shorter window. 0 disables connection pruning.
+  connection_retention_hours: 24
+  # How often (seconds) the runtime loop performs retention pruning.
+  prune_interval_seconds: 3600
+
+detection:
+  # Thresholds are in megabits per second (Mb/s), matching the units used by
+  # most consumer tools. Internally they are converted to bytes/second
+  # (1 Mb/s = 125000 B/s). Set to 0 to disable a rule.
+  download_threshold_mbps: 10
+  upload_threshold_mbps: 5
+  # Connection count spike: current > baseline * multiplier.
+  connection_spike_multiplier: 3.0
+  # Minimum observed connections before a spike can be reported (avoids
+  # firing on 1 -> 3 connections).
+  connection_spike_min_baseline: 10
+  # A collector that has not reported success for this many seconds is
+  # considered failed and raises a COLLECTOR_FAILURE event.
+  collector_failure_timeout_seconds: 15
+  # Minimum seconds between two identical events (rule + subject).
+  event_cooldown_seconds: 60
+  # Seed the "seen processes" baseline on startup. When true, already-running
+  # network processes do not raise NEW_NETWORK_PROCESS on the first cycle.
+  seed_processes_on_start: true
+  # New-network-process rule can be noisy on busy machines. Disable if needed.
+  new_process_rule_enabled: true
+
+notifications:
+  # Master switch. Notifications never block the monitoring loop.
+  enabled: false
+  # Only events at or above this severity are dispatched.
+  # One of: info, warning, critical
+  min_severity: warning
+  # Drop duplicate notifications of the same event type within this window.
+  cooldown_seconds: 300
+  email:
+    enabled: false
+    smtp_host: smtp.example.com
+    smtp_port: 587
+    use_tls: true
+    username: ""
+    # Prefer the LNM_SMTP_PASSWORD environment variable over writing a
+    # password into this file.
+    password: ""
+    sender: monitor@example.com
+    recipients:
+      - admin@example.com
+
+logging:
+  level: INFO
+  file: logs/monitor.log
+  max_bytes: 5242880
+  backup_count: 3
+  console: true

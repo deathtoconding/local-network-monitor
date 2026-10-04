@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-network-monitor"
+version = "0.1.0"
+description = "Local Network Monitor - measure, explain and display what this machine is doing on the network."
+readme = "README.md"
+# Target platform is Python 3.12+ on Windows 10/11. The code deliberately
+# avoids 3.12-only syntax so it also runs on 3.11 (used by CI / dev sandboxes).
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Local Network Monitor contributors" }]
+keywords = ["network", "monitoring", "windows", "psutil", "fastapi", "sqlite"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "psutil>=5.9",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+network-monitor = "network_monitor.main:run"
+
+[project.urls]
+Homepage = "https://github.com/deathtoconding/local-network-monitor"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+network_monitor = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = [
+    "B008",  # FastAPI declares dependencies via function-call defaults by design
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
