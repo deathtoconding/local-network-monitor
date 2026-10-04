@@ -72,7 +72,9 @@ class TestTrafficEndpoints:
         state.publish_cycle(
             timestamp=utc_now(),
             measurements=[
-                make_measurement(interface="Ethernet", download_rate=18_400_000.0, upload_rate=2_100_000.0),
+                make_measurement(
+                    interface="Ethernet", download_rate=18_400_000.0, upload_rate=2_100_000.0
+                ),
                 make_measurement(interface="Wi-Fi", download_rate=600_000.0, upload_rate=100_000.0),
             ],
             connections=[],
@@ -142,7 +144,9 @@ class TestConnectionEndpoints:
             measurements=[],
             connections=[
                 make_connection(pid=8420, process_name="chrome.exe", timestamp=now),
-                make_connection(pid=9312, process_name="python.exe", timestamp=now, remote_port=8443),
+                make_connection(
+                    pid=9312, process_name="python.exe", timestamp=now, remote_port=8443
+                ),
             ],
             processes=[],
             duration_ms=1.0,
@@ -159,7 +163,9 @@ class TestConnectionEndpoints:
             measurements=[],
             connections=[
                 make_connection(pid=8420, process_name="chrome.exe", timestamp=now),
-                make_connection(pid=9312, process_name="python.exe", state_name="LISTEN", timestamp=now),
+                make_connection(
+                    pid=9312, process_name="python.exe", state_name="LISTEN", timestamp=now
+                ),
             ],
             processes=[],
             duration_ms=1.0,
@@ -183,13 +189,17 @@ class TestConnectionEndpoints:
 class TestProcessEndpoints:
     def test_processes_include_connection_counts(self, client, state):
         now = utc_now()
-        state.processes.upsert_many([ProcessInfo(pid=8420, name="chrome.exe", executable="C:/chrome.exe", last_seen=now)])
+        state.processes.upsert_many(
+            [ProcessInfo(pid=8420, name="chrome.exe", executable="C:/chrome.exe", last_seen=now)]
+        )
         state.publish_cycle(
             timestamp=now,
             measurements=[],
             connections=[
                 make_connection(pid=8420, process_name="chrome.exe", timestamp=now),
-                make_connection(pid=8420, process_name="chrome.exe", timestamp=now, remote_port=8443),
+                make_connection(
+                    pid=8420, process_name="chrome.exe", timestamp=now, remote_port=8443
+                ),
             ],
             processes=[],
             duration_ms=1.0,
@@ -224,7 +234,11 @@ class TestEventEndpoints:
                     title="High upload traffic on Ethernet",
                     description="Upload traffic exceeded the configured threshold.",
                     interface_name="Ethernet",
-                    evidence={"interface": "Ethernet", "upload_rate": 9_000_000, "threshold": 5_000_000},
+                    evidence={
+                        "interface": "Ethernet",
+                        "upload_rate": 9_000_000,
+                        "threshold": 5_000_000,
+                    },
                 ),
                 Event(
                     timestamp=now,
@@ -270,7 +284,53 @@ class TestEventEndpoints:
 
     def test_invalid_status_value_is_rejected(self, client, state):
         event_id = self._seed_events(state)[0]
-        assert client.patch(f"/api/events/{event_id}", json={"status": "nonsense"}).status_code == 422
+        assert (
+            client.patch(f"/api/events/{event_id}", json={"status": "nonsense"}).status_code == 422
+        )
+
+
+class TestDashboardPackaging:
+    """The dashboard ships inside the package: a wheel must be a complete product."""
+
+    def test_packaged_web_directory_exists(self):
+        from network_monitor.api.app import WEB_DIR, resolve_web_dir
+
+        assert WEB_DIR.is_dir(), "dashboard assets missing from the package"
+        assert (WEB_DIR / "index.html").is_file()
+        assert (WEB_DIR / "css" / "app.css").is_file()
+        assert (WEB_DIR / "js" / "app.js").is_file()
+        assert resolve_web_dir() == WEB_DIR
+
+    def test_environment_override_wins(self, tmp_path, monkeypatch):
+        from network_monitor.api.app import resolve_web_dir
+
+        monkeypatch.setenv("LNM_WEB_DIR", str(tmp_path))
+        assert resolve_web_dir() == tmp_path
+
+    def test_default_app_serves_the_real_dashboard(self, state):
+        """No web_dir argument: the packaged assets are used."""
+        from fastapi.testclient import TestClient
+
+        from network_monitor.api import create_app
+
+        app = create_app(state=state)
+        with TestClient(app) as client:
+            page = client.get("/")
+            assert page.status_code == 200
+            assert "Local Network Monitor" in page.text
+            assert client.get("/static/js/app.js").status_code == 200
+            assert client.get("/static/css/app.css").status_code == 200
+
+    def test_missing_assets_degrade_to_a_clear_message(self, state, tmp_path):
+        from fastapi.testclient import TestClient
+
+        from network_monitor.api import create_app
+
+        app = create_app(state=state, web_dir=tmp_path / "nope")
+        with TestClient(app) as client:
+            response = client.get("/")
+            assert response.status_code == 503
+            assert "dashboard assets are missing" in response.json()["detail"]
 
 
 class TestMiscEndpoints:

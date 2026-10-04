@@ -49,7 +49,14 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-network_monitor = ["py.typed"]
+# The dashboard is part of the package so that `pip install` yields a complete
+# product: a wheel without web/ would serve the API and an empty page.
+network_monitor = [
+    "py.typed",
+    "web/*.html",
+    "web/css/*.css",
+    "web/js/*.js",
+]
 
 [tool.ruff]
 line-length = 100

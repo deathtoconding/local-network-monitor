@@ -9,6 +9,8 @@ the same process - no second server, no CORS configuration.
 from __future__ import annotations
 
 import logging
+import os
+from importlib import resources
 from pathlib import Path
 from typing import Optional
 
@@ -24,8 +26,31 @@ from .state import MonitorState, build_state
 
 logger = logging.getLogger(__name__)
 
-#: repository_root/web
-WEB_DIR = Path(__file__).resolve().parents[3] / "web"
+
+#: Where the dashboard assets live. They ship *inside* the package
+#: (``network_monitor/web``) so an installed wheel is a complete product - which
+#: is verified by the CI package job, not assumed.
+def resolve_web_dir() -> Path:
+    """Locate the dashboard assets.
+
+    Order: explicit ``LNM_WEB_DIR`` environment override, the packaged
+    ``network_monitor/web`` directory, then a source checkout layout. The env
+    override exists so the dashboard can be developed or replaced without
+    touching the installed package.
+    """
+    override = os.environ.get("LNM_WEB_DIR")
+    if override:
+        return Path(override).expanduser()
+    try:
+        packaged = Path(str(resources.files("network_monitor"))) / "web"
+        if packaged.is_dir():
+            return packaged
+    except (ImportError, ModuleNotFoundError, TypeError):  # pragma: no cover
+        pass
+    return Path(__file__).resolve().parents[1] / "web"
+
+
+WEB_DIR = resolve_web_dir()
 
 
 def create_app(
@@ -61,7 +86,7 @@ def create_app(
     app.include_router(router)
     app.state.monitor = monitor_state
 
-    static_dir = Path(web_dir) if web_dir else WEB_DIR
+    static_dir = Path(web_dir) if web_dir else resolve_web_dir()
     if static_dir.is_dir():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
