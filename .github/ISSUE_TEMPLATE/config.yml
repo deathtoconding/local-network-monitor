@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/deathtoconding/local-network-monitor/security/advisories/new
+    about: Report privately — never in a public issue.
+  - name: Operating the monitor (runbook)
+    url: https://github.com/deathtoconding/local-network-monitor/blob/main/docs/RUNBOOK.md
+    about: Symptoms, diagnosis and recovery procedures.
+  - name: Questions and design discussion
+    url: https://github.com/deathtoconding/local-network-monitor/discussions
+    about: Ask about direction, design trade-offs or deployment.

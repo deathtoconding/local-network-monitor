@@ -1,0 +1,11 @@
+# Default owner for everything in the repository.
+*                       @deathtoconding
+
+# Areas worth an explicit review, because a mistake here is expensive:
+/src/network_monitor/collectors/     @deathtoconding   # OS interaction, parsing untrusted output
+/src/network_monitor/storage/        @deathtoconding   # durability, schema, retention
+/src/network_monitor/detection/      @deathtoconding   # alert correctness
+/src/network_monitor/api/            @deathtoconding   # public contract + metrics/SLIs
+/.github/workflows/                  @deathtoconding   # CI/CD and release supply chain
+/SECURITY.md                         @deathtoconding
+/docs/SLO.md                         @deathtoconding

@@ -1,0 +1,38 @@
+# Fast local gate. CI runs the same checks plus tests, so a pre-commit failure is
+# always cheaper to fix here than in the pipeline.
+#
+#   python -m pip install pre-commit && pre-commit install
+minimum_pre_commit_version: "3.5.0"
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: pytest (fast subset)
+        entry: python -m pytest -q tests/test_metering.py tests/test_detection.py tests/test_api.py
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
