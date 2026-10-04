@@ -108,6 +108,30 @@ jobs:
           python -m network_monitor --check-config
           python -m network_monitor --once --config config.yaml
 
+  report-cleanup:
+    name: Clear stale failure report
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Only runs when the whole matrix passed: a green run must not leave a
+    # "Tests failed" comment behind, and a red run must not delete the diagnostic
+    # that a still-failing sibling job just wrote.
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Delete the CI failure report comment, if any
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          for id in $(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments?per_page=100" \
+                        --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | startswith("### Tests failed")) | .id'); do
+            gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$id" || true
+          done
+
   security:
     name: Dependency audit
     runs-on: ubuntu-latest
