@@ -184,9 +184,17 @@ covered by `tests/test_api.py`.
 | `GET /api/events` | Done (+ severity/type/status filters, paging) |
 | `GET /api/events/{id}` | Done — evidence included |
 
-Additional, non-specified endpoints: `GET /api/health`, `GET /api/system`,
-`GET /api/info`, `PATCH /api/events/{id}`, OpenAPI at `/api/openapi.json`,
-Swagger UI at `/api/docs`.
+Additional, non-specified endpoints: `GET /api/health`, `GET /api/ready`,
+`GET /api/system`, `GET /api/info`, `GET /api/metrics`,
+`PATCH /api/events/{id}`, OpenAPI at `/api/openapi.json`, Swagger UI at
+`/api/docs`.
+
+### Operational endpoints added after the MVP (v0.1.x)
+
+| Endpoint | Purpose | Documented in |
+|---|---|---|
+| `GET /api/ready` | Depth probe: database writable, loop fresh, last cycle clean | [SLO.md](SLO.md), [RUNBOOK.md](RUNBOOK.md) |
+| `GET /api/metrics` | Prometheus text exposition with bounded cardinality | [ARCHITECTURE.md §12](ARCHITECTURE.md), [ADR-0008](adr/0008-hand-rolled-prometheus-exposition.md) |
 
 ---
 
@@ -225,7 +233,10 @@ Implemented in `Monitor.run_forever` / `Monitor.cycle`, default interval 1.0 s
 | Integration | collector → normaliser → database → detection → event | `test_integration.py` |
 | API | all endpoints return 200 | `test_api.py` |
 
-Run with `python -m pytest` (157 tests).
+Run with `python -m pytest` (251 tests, 88 % coverage; CI enforces an 85 % floor).
+An additional level exists beyond the specification: **fault injection**
+(`tests/test_fault_injection.py`) breaks storage, collectors, a detection rule and
+the notifier, and asserts that the loop survives and reports the failure.
 
 ---
 
@@ -236,8 +247,8 @@ Run with `python -m pytest` (157 tests).
 | Reliability: a collector failure must not stop the monitor | Done | `Monitor._safe_collect`, `test_monitor.py::TestResilience` |
 | Performance: low overhead | Done | 1 s interval, snapshot de-duplication, cached process lookups, indexed queries |
 | Data integrity: timestamps + consistent units | Done | UTF-8 ISO-8601 UTC, bytes/s everywhere |
-| Observability: collector status, last success, errors, logs | Done | `/api/status`, collector health table, rotating log file |
-| Maintainability: independently testable layers | Done | collectors/storage/detection/API/notifications separated; 157 tests |
+| Observability: collector status, last success, errors, logs | Done | `/api/status` (SLIs), `/api/ready`, `/api/metrics`, collector health table, rotating log file in text or JSON |
+| Maintainability: independently testable layers | Done | collectors/storage/detection/API/notifications separated; 251 tests |
 | Security: bind locally, validate subprocess args, no arbitrary execution, minimal data | Done | loopback default, fixed argument lists, `shell=False`, timeouts, no payload capture |
 
 ---
@@ -351,7 +362,10 @@ reviewed independently.
 | 4 | `/api/system` and `PATCH /api/events/{id}` added; OpenAPI moved to `/api/openapi.json` (UI at `/api/docs`) | Small, clearly useful additions; `/docs` is left to the UI's own layout |
 | 5 | `SystemSnapshot.connection_states` is filled from the connections already collected | Avoids walking the socket table twice per cycle |
 | 6 | `--once`, `--api-only`, `--check-config` CLI flags added | Make the tool verifiable and testable without a long-running server |
-| 7 | "Exportable measurements" is served as JSON over the API | CSV was not specified concretely; the API already exposes the raw series |
+| 7 | "Exportable measurements" is served as JSON over the API | CSV was not specified concretely; the API already exposes the raw series (CSV export is LNM-102 in [PLAN.md](PLAN.md)) |
+| 8 | Dashboard assets ship inside the package (`src/network_monitor/web/`), not at the repository root | A wheel that serves the API and no dashboard is not a product; the CI packaging job starts the installed wheel and fetches the real page |
+| 9 | `/api/ready` returns 503 when the last cycle recorded errors | A probe that reports "ready" while serving data from failed collectors is worse than no probe; SLO-8 in [SLO.md](SLO.md) makes it a promise |
+| 10 | Logging gained a `json` layout; metrics, readiness and CI were added beyond the MVP scope | The specification asks for observability and resilience; these are the mechanisms that make both measurable rather than aspirational |
 
 ---
 

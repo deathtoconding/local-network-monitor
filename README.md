@@ -6,6 +6,16 @@ active TCP connections with the processes that own them, applies a small set of
 **deterministic** detection rules, stores everything in SQLite, and shows it in
 a local web dashboard.
 
+[![CI](https://github.com/deathtoconding/local-network-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/deathtoconding/local-network-monitor/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Linux%20%7C%20macOS-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**Documentation:** [Architecture](docs/ARCHITECTURE.md) ·
+[SLOs](docs/SLO.md) · [Runbook](docs/RUNBOOK.md) · [Plan](docs/PLAN.md) ·
+[Specification](docs/SPECIFICATION.md) · [Decisions](docs/adr/README.md) ·
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+
 It answers five questions:
 
 1. What is my computer doing on the network?
@@ -121,6 +131,17 @@ Expected banner:
 Open <http://127.0.0.1:8000> for the dashboard and
 <http://127.0.0.1:8000/api/docs> for the interactive API reference (Swagger UI).
 
+Installing the package gives you the same thing as a console script:
+
+```powershell
+python -m pip install .          # or: pip install -e ".[dev]" for development
+network-monitor --once
+```
+
+The dashboard ships inside the package, so an installed wheel is a complete
+product — the CI packaging job starts the installed wheel and fetches the real
+page to prove it.
+
 ### Command-line options
 
 | Flag | Meaning |
@@ -171,6 +192,8 @@ bytes/second (megabit values are provided alongside for readability).
 | `GET` | `/api/events/{id}` | One event including its structured evidence |
 | `PATCH` | `/api/events/{id}` | Set event status (`open` / `acknowledged` / `resolved`) |
 | `GET` | `/api/system` | Host metrics and storage row counts |
+| `GET` | `/api/ready` | Depth probe: database writable, loop fresh, last cycle clean (503 when not ready) |
+| `GET` | `/api/metrics` | Prometheus text exposition for scraping |
 
 Example:
 
@@ -244,6 +267,7 @@ notifications:
 
 logging:
   level: INFO
+  format: text                    # text for humans, json for log shippers
   file: logs/monitor.log
   max_bytes: 5242880
   backup_count: 3
@@ -331,7 +355,7 @@ local-network-monitor/
 │   ├── main.py              # CLI entry point, banner, uvicorn wiring
 │   ├── monitor.py           # the runtime loop (COLLECT..DISPLAY)
 │   ├── config.py            # layered configuration (defaults <- YAML)
-│   ├── logging_setup.py     # rotating file + console logging
+│   ├── logging_setup.py     # rotating file + console logging (text or JSON)
 │   ├── collectors/
 │   │   ├── base.py          # Collector contract + CollectorError
 │   │   ├── interface.py     # counters + RateCalculator
@@ -341,14 +365,19 @@ local-network-monitor/
 │   ├── models/              # network.py, process.py, events.py, health.py
 │   ├── storage/             # database.py (SQLite), repositories.py, schema.py
 │   ├── detection/           # rules.py, engine.py
-│   ├── api/                 # app.py, routes.py, state.py
-│   └── notifications/       # manager.py, email.py
-├── tests/                   # 157 tests: unit, collector, integration, API
-├── web/                     # dashboard (index.html, css/, js/) - no build step
-├── docs/SPECIFICATION.md    # MVP specification and implementation status
+│   ├── api/                 # app.py, routes.py, state.py, metrics.py
+│   ├── notifications/       # manager.py, email.py
+│   └── web/                 # dashboard assets, shipped inside the package
+├── tests/                   # 251 tests: unit, collector, integration, API, chaos
+├── docs/                    # architecture, SLOs, runbook, plan, ADRs, spec
+├── .github/                 # CI, CodeQL, release workflow, templates
 ├── config.yaml              # documented defaults
-└── requirements*.txt, pyproject.toml
+└── requirements*.txt, pyproject.toml, Makefile, scripts/
 ```
+
+The dashboard lives inside the package (`src/network_monitor/web/`) rather than
+at the repository root, so `pip install` produces a complete product instead of
+an API with a missing page.`
 
 ### Collector contract, and what "resilience" means here
 
@@ -387,14 +416,42 @@ unreachable SMTP server therefore cannot block the monitoring loop. Email
 delivery is off by default; configure `notifications.email.*` and set
 `LNM_SMTP_PASSWORD` in the environment rather than a password in the YAML file.
 
-## 11. Tests
+## 11. Operability
+
+The monitor is meant to be run for weeks, so it carries its own operations
+surface rather than expecting someone to watch it:
+
+| Need | Where |
+|---|---|
+| "Is it healthy right now?" | `GET /api/status` — collector states, SLIs, `last_errors` |
+| "Is it safe to depend on?" | `GET /api/ready` — 503 unless the database is writable, the loop is fresh **and** the last cycle was clean |
+| "Show me in my monitoring tool" | `GET /api/metrics` — Prometheus text, bounded cardinality, no client library |
+| "What happened at 03:00?" | `GET /api/events` + `logs/monitor.log` (JSON layout optional) |
+| "What do I do about X?" | [RUNBOOK.md](docs/RUNBOOK.md) |
+| "How good is good enough?" | [SLO.md](docs/SLO.md) — targets, error budget, alert expressions |
+| "Why is it built like this?" | [ARCHITECTURE.md](docs/ARCHITECTURE.md) + [ADRs](docs/adr/README.md) |
+
+```powershell
+curl -s http://127.0.0.1:8000/api/ready
+# {"ready":true,"checks":{"collection_errors":true,"collection_loop":true,"database":true,"notifications":true},...}
+
+curl -s http://127.0.0.1:8000/api/metrics | Select-String lnm_collector_up
+# lnm_collector_up{collector="interface"} 1
+# lnm_collector_up{collector="connections"} 1
+```
+
+A stalled loop, an unwritable database, or a collector that failed on the last
+cycle all turn `/api/ready` into a 503 — the probe deliberately refuses to report
+"ready" while serving data it cannot vouch for.
+
+## 12. Tests
 
 ```bash
-python -m pytest              # 157 tests, ~2 s
+python -m pytest              # 251 tests, ~2 s
 python -m pytest -k rate      # rate calculation only
 ```
 
-Four levels, matching the specification:
+Levels, matching the specification:
 
 - **Unit** — rate calculation (including counter resets), threshold rules, event
   creation, data normalisation
@@ -403,8 +460,16 @@ Four levels, matching the specification:
 - **Integration** — collector → normaliser → SQLite → detection → event → API
 - **API** — every documented endpoint returns 200 with valid JSON, plus filters,
   404s and 422 validation
+- **Fault injection** (`test_fault_injection.py`) — storage failures, dead
+  collectors, an exploding detection rule and an unreachable SMTP server: the loop
+  must survive all of them and say so
+- **Observability** (`test_observability.py`) — metrics parse, readiness
+  semantics, JSON log shape
 
-## 12. Windows notes
+CI runs the matrix on **Windows and Linux, Python 3.11 and 3.12**, with an 85 %
+coverage floor (currently 88 %).
+
+## 13. Windows notes
 
 - **Connection collector priority:** `Get-NetTCPConnection` (gives the owning
   PID directly) → `psutil.net_connections` → `netstat -ano`. All three produce
@@ -421,7 +486,7 @@ Four levels, matching the specification:
   and Windows Performance Counters as future sources; the model and the loop
   would not change.
 
-## 13. Security posture
+## 14. Security posture
 
 - Binds to `127.0.0.1` by default; use `--host 0.0.0.0` only deliberately
 - No authentication in the MVP (single-user local tool) — so never expose it
@@ -431,14 +496,14 @@ Four levels, matching the specification:
 - No packet payload is read or stored; only endpoint metadata and process names
 - SMTP credentials come from the environment, not the repository
 
-## 14. Roadmap (explicitly not in the MVP)
+## 15. Roadmap (explicitly not in the MVP)
 
 Packet capture, deep packet inspection, ML anomaly detection, exact per-process
 byte accounting, multi-machine monitoring, cloud deployment, authentication,
 PostgreSQL, Redis, Kafka, containerisation. See
 [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) for the full scope boundary.
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
@@ -448,7 +513,9 @@ PostgreSQL, Redis, Kafka, containerisation. See
 | `COLLECTOR_FAILURE` for `connections` | `Get-NetTCPConnection` is slow or blocked; check `logs/monitor.log` and `consecutive_failures`. |
 | Rates look like 0 for the first second | The first cycle only establishes the baseline; rates need two samples. |
 | Dashboard reachable but empty | The monitor has not completed a cycle yet, or `--api-only` is serving an empty database. |
+| `/api/ready` returns 503 | Read `checks` in the response: `database`, `collection_loop` or `collection_errors` names the failing area. |
+| `/api/metrics` empty in Grafana | The scrape path is relative; some agents need the full URL including `/api/metrics`. |
 
-## 16. License
+## 17. License
 
-MIT.
+MIT. See [LICENSE](LICENSE).
