@@ -1,0 +1,38 @@
+# Files shipped in the source distribution (sdist).
+#
+# The wheel is the installable product and needs only the package; the sdist is
+# the *source* of the project, so it carries everything a reader needs to build
+# it, run it, and understand why it is shaped this way: configuration, the full
+# documentation set, the community files and the developer tooling.
+#
+# Build and verify:  python -m build && python -m twine check dist/*
+# CI asserts that docs/ and config.yaml are actually present in the sdist.
+
+include LICENSE
+include README.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include SECURITY.md
+include CODE_OF_CONDUCT.md
+include config.yaml
+include Makefile
+include requirements.txt
+include requirements-dev.txt
+include .pre-commit-config.yaml
+include .gitignore
+
+recursive-include docs *.md
+recursive-include scripts *.sh *.ps1 *.js
+include scripts/dev.sh
+
+# Never ship bytecode, caches or local state, whatever happens to be lying around.
+global-exclude *.py[cod]
+global-exclude __pycache__/*
+prune data
+prune logs
+prune dist
+prune build
+prune .venv
+prune node_modules
+prune .pytest_cache
+prune .ruff_cache

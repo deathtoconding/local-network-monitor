@@ -66,6 +66,12 @@ Public API = the REST endpoints and the configuration file.
 
 ### Fixed
 
+- The source distribution shipped the code and the tests but not the
+  documentation: no `docs/`, no `config.yaml`, no `CONTRIBUTING.md`/`SECURITY.md`.
+  `MANIFEST.in` now carries the full documentation set, the sample configuration
+  and the developer tooling, and the CI packaging job asserts that they are
+  present, so a reader who downloads the sdist can build, run and understand the
+  project from one file.
 - The dashboard markup was served with no `Cache-Control` header, so a browser
   could replay a stale copy after a redesign - a live monitoring page is exactly
   the wrong thing to serve from cache. `/` now answers `no-store,

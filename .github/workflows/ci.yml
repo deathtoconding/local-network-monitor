@@ -191,6 +191,19 @@ jobs:
         run: python -m build
       - name: Check metadata
         run: python -m twine check dist/*
+      - name: Verify the sdist carries the documentation
+        run: |
+          set -euo pipefail
+          # The sdist is the source of the project, not just the code: a reader
+          # must be able to build it and understand it from the same download.
+          for required in docs/ARCHITECTURE.md docs/SLO.md docs/RUNBOOK.md docs/PLAN.md \
+                          docs/DASHBOARD.md docs/SPECIFICATION.md docs/adr/README.md \
+                          config.yaml CONTRIBUTING.md SECURITY.md CHANGELOG.md; do
+            tar -tzf dist/*.tar.gz | grep -q "/$required$" \
+              || { echo "missing from sdist: $required"; exit 1; }
+          done
+          echo "sdist documentation complete"
+          tar -tzf dist/*.tar.gz | grep -c 'docs/.*\.md'
       - name: Install the wheel in a clean environment and run it
         run: |
           python -m venv /tmp/verify
