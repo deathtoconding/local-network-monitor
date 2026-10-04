@@ -92,7 +92,13 @@ def create_app(
 
         @app.get("/", include_in_schema=False)
         def dashboard() -> FileResponse:
-            return FileResponse(static_dir / "index.html")
+            # Never cache the dashboard markup: it is a live view, and a browser
+            # replaying a stale copy after an upgrade looks exactly like a broken
+            # monitor. Static assets are versioned with a query string instead.
+            return FileResponse(
+                static_dir / "index.html",
+                headers={"Cache-Control": "no-store, must-revalidate"},
+            )
 
         @app.get("/favicon.ico", include_in_schema=False)
         def favicon() -> JSONResponse:  # browsers cope fine with an empty 204

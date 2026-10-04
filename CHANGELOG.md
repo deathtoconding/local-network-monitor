@@ -66,6 +66,10 @@ Public API = the REST endpoints and the configuration file.
 
 ### Fixed
 
+- The dashboard markup was served with no `Cache-Control` header, so a browser
+  could replay a stale copy after a redesign - a live monitoring page is exactly
+  the wrong thing to serve from cache. `/` now answers `no-store,
+  must-revalidate`; the versioned static assets are unaffected.
 - `ProcessResolver` treated a cache entry as valid when its age equalled the
   TTL. Windows' coarse monotonic clock made that observable: a processor
   cache configured with `cache_ttl_seconds = 0` still served entries.

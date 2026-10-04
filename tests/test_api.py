@@ -321,6 +321,18 @@ class TestDashboardPackaging:
             assert client.get("/static/js/app.js").status_code == 200
             assert client.get("/static/css/app.css").status_code == 200
 
+    def test_dashboard_is_never_cached(self, state):
+        """A live view that a browser can replay from cache ages into a lie."""
+        from fastapi.testclient import TestClient
+
+        from network_monitor.api import create_app
+
+        app = create_app(state=state)
+        with TestClient(app) as client:
+            response = client.get("/")
+            assert response.status_code == 200
+            assert "no-store" in response.headers.get("cache-control", "")
+
     def test_missing_assets_degrade_to_a_clear_message(self, state, tmp_path):
         from fastapi.testclient import TestClient
 
