@@ -105,6 +105,31 @@ Review this register every release; add an entry for every production incident.
 | Status | `status/blocked`, `status/needs-info`, `status/good-first-issue` | Triage state |
 | SRE | `sre/reliability`, `sre/observability`, `sre/security` | Cross-cutting work that follows the error-budget policy in [SLO.md](SLO.md) |
 
+### Intended triage, per roadmap item
+
+The tables in §2 state the work; this one states how each item is filed, so a
+fresh clone can be re-triaged identically without guessing.
+
+| Item | Labels | Milestone |
+|---|---|---|
+| LNM-101 | `type/feature`, `area/ops`, `priority/P1`, `sre/observability` | v0.2.0 |
+| LNM-102 | `type/feature`, `area/api`, `priority/P2`, `status/good-first-issue` | v0.2.0 |
+| LNM-103 | `type/feature`, `area/storage`, `priority/P1`, `sre/reliability` | v0.2.0 |
+| LNM-104 | `type/feature`, `area/detection`, `area/ops`, `priority/P2`, `status/good-first-issue` | v0.2.0 |
+| LNM-105 | `type/feature`, `area/collectors`, `priority/P2`, `sre/observability` | v0.2.0 |
+| LNM-106 | `type/feature`, `area/storage`, `priority/P2`, `sre/reliability` | v0.2.0 |
+| LNM-201 | `type/feature`, `area/collectors`, `priority/P1` | v0.3.0 |
+| LNM-202 | `type/feature`, `area/collectors`, `area/api`, `priority/P2` | v0.3.0 |
+| LNM-203 | `type/feature`, `area/detection`, `priority/P2` | v0.3.0 |
+| LNM-204 | `type/feature`, `area/detection`, `priority/P2` | v0.3.0 |
+| LNM-301 | `type/feature`, `area/ui`, `priority/P2` | v0.4.0 |
+| LNM-302 | `type/feature`, `area/ui`, `priority/P2` | v0.4.0 |
+| LNM-303 | `type/feature`, `area/ops`, `priority/P2`, `sre/reliability` | v0.4.0 |
+| LNM-304 | `type/feature`, `area/detection`, `area/ops`, `priority/P2`, `sre/reliability` | v0.4.0 |
+
+`priority/P0` and `status/blocked` / `status/needs-info` are applied during
+triage, never in advance: an issue that has not been read yet is not P0.
+
 ### Milestones
 
 One milestone per release (`v0.2.0`, `v0.3.0`, …). A milestone closes only when
