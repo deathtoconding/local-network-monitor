@@ -109,7 +109,7 @@ operator turns off.
 
 | Cadence | Check | Command / artefact |
 |---|---|---|
-| Every commit | Unit + integration + API + fault-injection tests | `python -m pytest` (251 tests) |
+| Every commit | Unit + integration + API + fault-injection tests | `python -m pytest` (269 tests) |
 | Every commit | Lint, format, security lint | `ruff check`, `ruff format --check` |
 | Every pull request | CI on Linux + Windows, Python 3.11 + 3.12 | `.github/workflows/ci.yml` |
 | Weekly (dev) | Dependency audit, coverage trend | `pip-audit`, coverage report in CI |

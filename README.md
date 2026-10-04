@@ -160,19 +160,37 @@ has to be set up by hand, and restarting the monitor never deletes history.
 
 ## 5. Dashboard
 
-Four sections, refreshed every 2 seconds (1 s / 5 s / paused selectable):
+The dashboard is written as a story rather than a wall of widgets. It answers, in
+order, the questions an operator actually asks — and every section says how old
+its data is, because a monitoring page that cannot admit staleness is a hazard:
 
-- **Network status** — health, download/upload rate, active TCP connections,
-  24-hour event count, uptime, and a per-collector health strip
-- **Traffic history** — canvas chart of the last 15 minutes, download vs upload
-- **Interfaces** — per-interface rates, cumulative bytes, error/drop counters
-- **Processes & connections** — process name, PID, local and remote endpoints,
-  TCP state, with process / remote / state filters
-- **Events** — severity-coloured feed; click any event for its full evidence
+| # | Section | The question it answers |
+|---|---|---|
+| 1 | **Right now** | Is anything happening, and is it fine? A plain-language verdict, the live download/upload rate with a 15-minute sparkline, and five supporting numbers (connections, processes, events in 24 h, uptime, readiness) |
+| 2 | **Needs attention** | What broke? Warnings and criticals with the *why* the rule recorded and a click-through to structured evidence. Informational events are folded away so this list stays readable |
+| 3 | **Traffic trend** | What has been happening? 15-minute area chart with hover crosshair, per-sample rates, and a caption stating samples, window and peak |
+| 4 | **Who** | Which process owns those connections? Processes ranked by open connections, remote-endpoint counts, then the full connection table behind a disclosure with process / remote / state filters |
+| 5 | **Where** | Which interface carries it? Per-interface state, rates, cumulative bytes, errors and drops, with non-zero error counts highlighted |
+| 6 | **The monitor itself** | Can I trust this page? Collector runs/failures/durations, readiness checks, stored row counts and host facts, plus links to the raw JSON endpoints |
 
-A configurable table, no build step, no CDN: the dashboard is plain HTML/CSS/JS
-served by the same FastAPI process as the API, so it works on a machine with no
-internet access.
+Design system and interaction patterns:
+
+- **Semantic tokens** for colour, space, type and shape; light and dark themes
+  (system default, remembered per browser) from one token swap
+- **Progressive disclosure** — summary → list → row → dialog → raw JSON, never
+  all at once
+- **Severity is never colour alone** — every state also carries a word and a
+  glyph, and the headline "Right now" verdict is an `aria-live` region
+- **Explicit states** — skeletons on first load, honest empty states, a
+  partial-failure banner that names the sections that went stale instead of
+  blanking the page, and a freshness chip that turns amber then red
+- **No build step, no CDN, no external fonts** — plain HTML/CSS/JS served by the
+  same FastAPI process, so it works on a machine with no internet access
+
+Structure and copy are protected by `tests/test_dashboard.py`: every element the
+script queries must exist, tables must keep captions and scoped headers, no
+remote resource may creep in, and the tokens, states and reduced-motion rules
+must stay defined.
 
 ## 6. API
 
@@ -368,7 +386,8 @@ local-network-monitor/
 │   ├── api/                 # app.py, routes.py, state.py, metrics.py
 │   ├── notifications/       # manager.py, email.py
 │   └── web/                 # dashboard assets, shipped inside the package
-├── tests/                   # 251 tests: unit, collector, integration, API, chaos
+├── tests/                   # 269 tests: unit, collector, integration, API, chaos,
+│                            #             fault injection and dashboard contract
 ├── docs/                    # architecture, SLOs, runbook, plan, ADRs, spec
 ├── .github/                 # CI, CodeQL, release workflow, templates
 ├── config.yaml              # documented defaults
@@ -447,7 +466,7 @@ cycle all turn `/api/ready` into a 503 — the probe deliberately refuses to rep
 ## 12. Tests
 
 ```bash
-python -m pytest              # 251 tests, ~2 s
+python -m pytest              # 269 tests, ~2 s
 python -m pytest -k rate      # rate calculation only
 ```
 

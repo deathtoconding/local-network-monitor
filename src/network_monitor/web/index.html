@@ -3,83 +3,238 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="description" content="Local Network Monitor — what this machine is doing on the network, right now." />
   <title>Local Network Monitor</title>
-  <link rel="stylesheet" href="/static/css/app.css" />
+  <!-- No build step and no external assets: this page must render on a machine
+       with no internet access, so the only two requests are same-origin. -->
+  <link rel="stylesheet" href="/static/css/app.css?v=2" />
 </head>
-<body>
+<body data-state="loading">
+  <a class="skip-link" href="#main">Skip to the dashboard</a>
+
+  <!-- ============================ masthead ============================ -->
   <header class="topbar">
     <div class="brand">
-      <span class="dot" id="status-dot" aria-hidden="true"></span>
-      <div>
+      <span class="pulse" id="status-dot" data-state="unknown" aria-hidden="true"></span>
+      <div class="brand-text">
         <h1>Local Network Monitor</h1>
-        <p class="subtitle" id="subtitle">connecting&hellip;</p>
+        <p class="tagline" id="subtitle">connecting to the monitor…</p>
       </div>
     </div>
-    <div class="controls">
-      <label class="control">
-        Refresh
-        <select id="refresh-interval">
-          <option value="1000">1 s</option>
-          <option value="2000" selected>2 s</option>
-          <option value="5000">5 s</option>
-          <option value="0">paused</option>
-        </select>
-      </label>
-      <button id="refresh-now" class="button" type="button">Refresh now</button>
+
+    <div class="masthead-tools">
+      <!-- Freshness is the first thing an operator needs: is this page current? -->
+      <p class="freshness" id="freshness" data-state="waiting" role="status" aria-live="polite">
+        <span class="freshness-dot" aria-hidden="true"></span>
+        <span id="freshness-text">waiting for the first update</span>
+      </p>
+      <div class="controls">
+        <label class="control" for="refresh-interval">
+          Refresh
+          <select id="refresh-interval">
+            <option value="1000">every second</option>
+            <option value="2000" selected>every 2 s</option>
+            <option value="5000">every 5 s</option>
+            <option value="0">paused</option>
+          </select>
+        </label>
+        <button class="button" id="refresh-now" type="button">Refresh now</button>
+        <button class="button" id="theme-toggle" type="button" aria-describedby="theme-hint">Theme: auto</button>
+        <span class="sr-only" id="theme-hint">Cycles between the system theme, light and dark.</span>
+      </div>
     </div>
   </header>
 
-  <main>
-    <!-- A. Overview -->
-    <section class="card overview" aria-labelledby="overview-title">
-      <h2 id="overview-title">Network status</h2>
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">Health</span>
-          <span class="metric-value" id="metric-status">&mdash;</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Download</span>
-          <span class="metric-value accent-down" id="metric-download">&mdash;</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Upload</span>
-          <span class="metric-value accent-up" id="metric-upload">&mdash;</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Active TCP</span>
-          <span class="metric-value" id="metric-connections">&mdash;</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Events (24 h)</span>
-          <span class="metric-value" id="metric-events">&mdash;</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Uptime</span>
-          <span class="metric-value" id="metric-uptime">&mdash;</span>
-        </div>
+  <main id="main" aria-busy="true">
+
+    <!-- Failures to read data are loud, but never take the page down. -->
+    <p class="banner banner--error" id="error-banner" role="alert" hidden></p>
+
+    <!-- ====================== 1 · RIGHT NOW ======================
+         The headline answer: is anything happening, and is it fine? -->
+    <section class="panel hero" aria-labelledby="now-title">
+      <p class="eyebrow">1 · Right now</p>
+      <h2 class="verdict" id="now-title" aria-live="polite" aria-atomic="true">Connecting…</h2>
+      <p class="verdict-detail" id="now-detail">Reading the latest collection cycle.</p>
+
+      <div class="hero-grid">
+        <figure class="rate rate--down">
+          <figcaption>Download</figcaption>
+          <span class="rate-value" id="metric-download">—</span>
+          <span class="rate-sub" id="metric-download-mbps">—</span>
+        </figure>
+        <figure class="rate rate--up">
+          <figcaption>Upload</figcaption>
+          <span class="rate-value" id="metric-upload">—</span>
+          <span class="rate-sub" id="metric-upload-mbps">—</span>
+        </figure>
+        <figure class="spark">
+          <canvas id="sparkline" height="72" role="img"
+                  aria-label="Download and upload rate over the last 15 minutes"></canvas>
+          <figcaption class="spark-caption" id="spark-caption">last 15 minutes</figcaption>
+        </figure>
       </div>
-      <ul class="collector-list" id="collector-list"></ul>
+
+      <dl class="stat-strip">
+        <div class="stat">
+          <dt>Open connections</dt>
+          <dd id="metric-connections">—</dd>
+        </div>
+        <div class="stat">
+          <dt>Processes online</dt>
+          <dd id="metric-processes">—</dd>
+        </div>
+        <div class="stat">
+          <dt>Events · 24 h</dt>
+          <dd id="metric-events">—</dd>
+          <p class="stat-note" id="metric-events-note">&nbsp;</p>
+        </div>
+        <div class="stat">
+          <dt>Monitoring for</dt>
+          <dd id="metric-uptime">—</dd>
+          <p class="stat-note" id="metric-cycles">&nbsp;</p>
+        </div>
+        <div class="stat stat--health">
+          <dt>Readiness</dt>
+          <dd id="metric-readiness">—</dd>
+          <p class="stat-note" id="metric-readiness-note">&nbsp;</p>
+        </div>
+      </dl>
     </section>
 
-    <!-- Traffic chart -->
-    <section class="card" aria-labelledby="traffic-title">
-      <h2 id="traffic-title">Traffic history</h2>
+    <!-- ==================== 2 · NEEDS ATTENTION ====================
+         The tension in the story: what broke, when, and why it fired. -->
+    <section class="panel" aria-labelledby="attention-title">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">2 · Needs attention</p>
+          <h2 id="attention-title">Warnings and failures</h2>
+        </div>
+        <p class="panel-note" id="attention-note">loading…</p>
+      </div>
+
+      <ul class="event-list" id="attention-list">
+        <li class="skeleton skeleton--row"></li>
+        <li class="skeleton skeleton--row"></li>
+      </ul>
+
+      <p class="empty-state" id="attention-empty" hidden>
+        <strong>Nothing needs your attention.</strong>
+        No warning or critical event has been recorded in the last 24 hours.
+      </p>
+
+      <details class="disclosure" id="info-events-disclosure">
+        <summary>Informational observations (<span id="info-event-count">0</span>)</summary>
+        <p class="panel-note">
+          Informational events are observations, not problems — a new process using the
+          network, for example. They are listed here so the warning list above stays readable.
+        </p>
+        <ul class="event-list event-list--quiet" id="events-body"></ul>
+      </details>
+    </section>
+
+    <!-- ==================== 3 · TRAFFIC TREND ====================
+         What has been happening, and how unusual the current moment is. -->
+    <section class="panel" aria-labelledby="trend-title">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">3 · Traffic trend</p>
+          <h2 id="trend-title">Throughput over the last 15 minutes</h2>
+        </div>
+        <div class="legend" aria-hidden="true">
+          <span class="legend-item legend-item--down">download</span>
+          <span class="legend-item legend-item--up">upload</span>
+        </div>
+      </div>
       <div class="chart-wrap">
-        <canvas id="traffic-chart" height="180" aria-label="Traffic history chart"></canvas>
-        <div class="chart-legend">
-          <span class="legend legend-down">download</span>
-          <span class="legend legend-up">upload</span>
-          <span class="legend-note" id="chart-note">last 15 minutes</span>
-        </div>
+        <canvas id="traffic-chart" height="200"
+                role="img" aria-label="Download and upload throughput over the last 15 minutes"></canvas>
+        <div class="chart-tooltip" id="chart-tooltip" hidden></div>
       </div>
+      <p class="chart-caption" id="chart-note">collecting the first samples…</p>
     </section>
 
-    <!-- B. Interfaces -->
-    <section class="card" aria-labelledby="interfaces-title">
-      <h2 id="interfaces-title">Interfaces</h2>
+    <!-- ======================= 4 · WHO =======================
+         Attribution: which processes own the connections we can see. -->
+    <section class="panel" aria-labelledby="who-title">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">4 · Who</p>
+          <h2 id="who-title">Processes using the network</h2>
+        </div>
+        <p class="panel-note">Grouped by owning process, ranked by open connections.</p>
+      </div>
+
+      <ul class="process-list" id="process-list">
+        <li class="skeleton skeleton--row"></li>
+        <li class="skeleton skeleton--row"></li>
+        <li class="skeleton skeleton--row"></li>
+      </ul>
+
+      <p class="empty-state" id="process-empty" hidden>
+        No process currently owns a TCP connection.
+      </p>
+
+      <details class="disclosure" id="connections-disclosure">
+        <summary>All connections (<span id="connection-count">0</span>)</summary>
+        <div class="filters">
+          <label class="sr-only" for="filter-process">Filter by process</label>
+          <input id="filter-process" type="search" placeholder="filter process…" />
+          <label class="sr-only" for="filter-remote">Filter by remote endpoint</label>
+          <input id="filter-remote" type="search" placeholder="filter remote…" />
+          <label class="sr-only" for="filter-state">Filter by TCP state</label>
+          <select id="filter-state">
+            <option value="">all states</option>
+            <option value="ESTABLISHED">ESTABLISHED</option>
+            <option value="LISTEN">LISTEN</option>
+            <option value="SYN_SENT">SYN_SENT</option>
+            <option value="TIME_WAIT">TIME_WAIT</option>
+            <option value="CLOSE_WAIT">CLOSE_WAIT</option>
+            <option value="LAST_ACK">LAST_ACK</option>
+          </select>
+          <span class="filter-count" id="filter-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">TCP connections seen in the most recent collection cycle</caption>
+            <thead>
+              <tr>
+                <th scope="col">Process</th>
+                <th scope="col" class="num">PID</th>
+                <th scope="col">Local endpoint</th>
+                <th scope="col">Remote endpoint</th>
+                <th scope="col">State</th>
+              </tr>
+            </thead>
+            <tbody id="connections-body">
+              <tr><td colspan="5" class="empty">no data yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <p class="honesty">
+        <strong>What these numbers are.</strong> Connections are attributed to the PID that
+        owns them. Traffic is measured per interface. This dashboard deliberately does
+        <em>not</em> claim exact per-process byte counts — the operating system does not
+        expose that reliably, and inventing it would be worse than omitting it.
+      </p>
+    </section>
+
+    <!-- ==================== 5 · INTERFACES ====================
+         Where the traffic physically goes. -->
+    <section class="panel" aria-labelledby="interfaces-title">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">5 · Where</p>
+          <h2 id="interfaces-title">Network interfaces</h2>
+        </div>
+        <p class="panel-note" id="interfaces-note">loading…</p>
+      </div>
       <div class="table-wrap">
         <table>
+          <caption class="sr-only">Per-interface counters from the most recent collection cycle</caption>
           <thead>
             <tr>
               <th scope="col">Interface</th>
@@ -88,7 +243,7 @@
               <th scope="col" class="num">Upload</th>
               <th scope="col" class="num">Received</th>
               <th scope="col" class="num">Sent</th>
-              <th scope="col" class="num">Errors / Drops</th>
+              <th scope="col" class="num">Errors / drops</th>
             </tr>
           </thead>
           <tbody id="interfaces-body">
@@ -98,83 +253,93 @@
       </div>
     </section>
 
-    <!-- C. Processes / connections -->
-    <section class="card" aria-labelledby="connections-title">
-      <div class="card-head">
-        <h2 id="connections-title">Processes &amp; connections</h2>
-        <div class="filters">
-          <input id="filter-process" type="search" placeholder="filter process&hellip;" aria-label="Filter by process" />
-          <input id="filter-remote" type="search" placeholder="filter remote&hellip;" aria-label="Filter by remote endpoint" />
-          <select id="filter-state" aria-label="Filter by TCP state">
-            <option value="">all states</option>
-            <option value="ESTABLISHED">ESTABLISHED</option>
-            <option value="LISTEN">LISTEN</option>
-            <option value="TIME_WAIT">TIME_WAIT</option>
-            <option value="CLOSE_WAIT">CLOSE_WAIT</option>
-            <option value="SYN_SENT">SYN_SENT</option>
-          </select>
+    <!-- ================= 6 · IS THE MONITOR HEALTHY =================
+         The resolution: the tool watching the network, watched. -->
+    <section class="panel" aria-labelledby="health-title">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">6 · The monitor itself</p>
+          <h2 id="health-title">Collectors and storage</h2>
         </div>
+        <p class="panel-note" id="health-note">loading…</p>
       </div>
+
       <div class="table-wrap">
         <table>
+          <caption class="sr-only">Collector health for the current run</caption>
           <thead>
             <tr>
-              <th scope="col">Process</th>
-              <th scope="col" class="num">PID</th>
-              <th scope="col">Local</th>
-              <th scope="col">Remote</th>
+              <th scope="col">Collector</th>
               <th scope="col">State</th>
+              <th scope="col" class="num">Runs</th>
+              <th scope="col" class="num">Failures</th>
+              <th scope="col" class="num">Last run</th>
+              <th scope="col" class="num">Duration</th>
             </tr>
           </thead>
-          <tbody id="connections-body">
-            <tr><td colspan="5" class="empty">no data yet</td></tr>
+          <tbody id="collectors-body">
+            <tr><td colspan="6" class="empty">no data yet</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="footnote">
-        Connections are attributed to the owning PID. Traffic figures are measured per
-        interface &mdash; this dashboard does not claim exact per-process byte counts.
-      </p>
-    </section>
 
-    <!-- D. Events -->
-    <section class="card" aria-labelledby="events-title">
-      <div class="card-head">
-        <h2 id="events-title">Events</h2>
-        <div class="filters">
-          <select id="filter-severity" aria-label="Filter by severity">
-            <option value="">all severities</option>
-            <option value="critical">critical</option>
-            <option value="warning">warning</option>
-            <option value="info">info</option>
-          </select>
+      <div class="split">
+        <div>
+          <h3>Stored history</h3>
+          <dl class="kv" id="storage-list"></dl>
+        </div>
+        <div>
+          <h3>Readiness checks</h3>
+          <dl class="kv" id="readiness-list"></dl>
+        </div>
+        <div>
+          <h3>Host</h3>
+          <dl class="kv" id="host-list"></dl>
         </div>
       </div>
-      <ul class="event-list" id="events-body">
-        <li class="empty">no events yet</li>
-      </ul>
-    </section>
 
-    <footer class="footer">
-      <span id="footer-status">Local Network Monitor</span>
-      <span><a href="/api/docs">API docs</a> &middot; <a href="/api/status">/api/status</a></span>
-    </footer>
+      <details class="disclosure">
+        <summary>Raw JSON and machine-readable endpoints</summary>
+        <p class="panel-note">
+          The same data this page renders is available directly:
+          <a href="/api/status">/api/status</a> ·
+          <a href="/api/ready">/api/ready</a> ·
+          <a href="/api/metrics">/api/metrics</a> (Prometheus) ·
+          <a href="/api/system">/api/system</a> ·
+          <a href="/api/docs">API docs</a>
+        </p>
+      </details>
+    </section>
   </main>
 
-  <!-- Event detail dialog -->
-  <dialog id="event-dialog">
+  <footer class="footer">
+    <span id="footer-status">Local Network Monitor</span>
+    <span class="footer-note">
+      Binds to loopback by default · no packet capture · deterministic rules only
+    </span>
+  </footer>
+
+  <!-- Event evidence: progressive disclosure from a list row to the raw facts. -->
+  <dialog id="event-dialog" aria-labelledby="dialog-title">
     <article>
       <header>
-        <h3 id="dialog-title">Event</h3>
-        <button id="dialog-close" type="button" class="button ghost" aria-label="Close">&times;</button>
+        <div>
+          <p class="eyebrow" id="dialog-severity">event</p>
+          <h2 id="dialog-title">Event</h2>
+        </div>
+        <button id="dialog-close" type="button" class="button button--ghost" aria-label="Close event details">&times;</button>
       </header>
-      <p id="dialog-meta" class="dialog-meta"></p>
-      <p id="dialog-description"></p>
-      <h4>Evidence</h4>
-      <pre id="dialog-evidence"></pre>
+      <p class="dialog-meta" id="dialog-meta"></p>
+      <p class="dialog-description" id="dialog-description"></p>
+      <h3>Evidence</h3>
+      <dl class="kv kv--evidence" id="dialog-evidence"></dl>
+      <details class="disclosure">
+        <summary>Raw JSON</summary>
+        <pre id="dialog-raw"></pre>
+      </details>
     </article>
   </dialog>
 
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=2"></script>
 </body>
 </html>

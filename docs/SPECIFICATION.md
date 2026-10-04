@@ -233,7 +233,7 @@ Implemented in `Monitor.run_forever` / `Monitor.cycle`, default interval 1.0 s
 | Integration | collector → normaliser → database → detection → event | `test_integration.py` |
 | API | all endpoints return 200 | `test_api.py` |
 
-Run with `python -m pytest` (251 tests, 88 % coverage; CI enforces an 85 % floor).
+Run with `python -m pytest` (269 tests, 88 % coverage; CI enforces an 85 % floor).
 An additional level exists beyond the specification: **fault injection**
 (`tests/test_fault_injection.py`) breaks storage, collectors, a detection rule and
 the notifier, and asserts that the loop survives and reports the failure.
@@ -248,7 +248,7 @@ the notifier, and asserts that the loop survives and reports the failure.
 | Performance: low overhead | Done | 1 s interval, snapshot de-duplication, cached process lookups, indexed queries |
 | Data integrity: timestamps + consistent units | Done | UTF-8 ISO-8601 UTC, bytes/s everywhere |
 | Observability: collector status, last success, errors, logs | Done | `/api/status` (SLIs), `/api/ready`, `/api/metrics`, collector health table, rotating log file in text or JSON |
-| Maintainability: independently testable layers | Done | collectors/storage/detection/API/notifications separated; 251 tests |
+| Maintainability: independently testable layers | Done | collectors/storage/detection/API/notifications separated; 269 tests |
 | Security: bind locally, validate subprocess args, no arbitrary execution, minimal data | Done | loopback default, fixed argument lists, `shell=False`, timeouts, no payload capture |
 
 ---

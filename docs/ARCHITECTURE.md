@@ -236,6 +236,36 @@ a complete product, and the CI packaging job proves it by fetching the real page
 from the installed wheel. Same-origin serving removes any need for CORS beyond
 loopback development.
 
+### Dashboard design principles
+
+The front end is the only part of this project a non-programmer sees, so it is
+held to the same rules as the collectors:
+
+1. **It answers questions in order.** Right now → needs attention → trend → who →
+   where → is the monitor healthy. Each section is a heading in the document
+   outline, so the order is structure rather than a visual accident.
+2. **It states its own freshness.** The masthead chip reads "live · updated 2 s
+   ago", turns amber when a refresh lags and red when it fails, and says plainly
+   when it is paused. Stale data presented as current is the worst failure mode a
+   monitoring UI can have.
+3. **Partial failure is visible, not fatal.** Endpoints are fetched in parallel
+   with a timeout; sections that fail keep their last values and the banner names
+   them. Nothing is blanked to hide a problem.
+4. **Severity is never colour alone** — a word plus a glyph accompany every state,
+   and the verdict region is announced through `aria-live`.
+5. **Progressive disclosure**: headline → list → row → dialog → raw JSON. The
+   connection table and collector detail sit behind `<details>`, so the page is
+   readable at a glance without hiding anything permanently.
+6. **Tokens, not ad-hoc values.** One token set drives light and dark, spacing,
+   type and shape; a redesign becomes a change of values.
+7. **No build step, no CDN, no fonts, no tracking.** Three static files, relative
+   API paths (so the dashboard also works behind the preview proxy), and
+   `textContent` only - never `innerHTML`.
+
+These invariants are enforced by `tests/test_dashboard.py`; behaviour against real
+API payloads is exercised in a DOM (jsdom) during development, because the Python
+suite cannot run a browser.
+
 ---
 
 ## 8. Failure domains

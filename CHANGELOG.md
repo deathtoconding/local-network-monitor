@@ -35,6 +35,28 @@ Public API = the REST endpoints and the configuration file.
 
 ### Changed
 
+- **Dashboard redesigned as a story** instead of a grid of tables. It now answers,
+  in order: *right now* (plain-language verdict, live rates, 15-minute sparkline,
+  readiness), *needs attention* (warnings and failures with their recorded
+  reasoning, informational events folded away), *traffic trend* (area chart with
+  hover crosshair and a caption stating samples/window/peak), *who* (processes
+  ranked by open connections, then the full connection table behind a disclosure),
+  *where* (per-interface detail with error highlighting) and *the monitor itself*
+  (collector runs/failures, readiness checks, storage, host facts).
+- The dashboard states its own freshness (live / lagging / stale / paused) and
+  names the sections that failed to refresh instead of blanking them; a first
+  light/dark theme with a remembered toggle, semantic design tokens, skeletons,
+  honest empty states, and an evidence dialog that labels rule evidence in words
+  rather than showing raw keys.
+- Accessibility is now part of the tests: one `h1`, landmarks, a skip link, an
+  `aria-live` verdict, captions and scoped headers on every table, a glyph and a
+  word alongside every severity, visible focus, and `prefers-reduced-motion` /
+  `prefers-color-scheme` support.
+- `tests/test_dashboard.py` (18 tests) turns the dashboard's structural promises
+  into assertions: every element the script queries must exist, no remote
+  resource may be referenced, API calls stay relative, `innerHTML` is forbidden,
+  and the token set, state hooks and story order must stay defined.
+
 - `/api/status` reports `degraded` when the last cycle recorded errors, not only
   when a collector is in the `failed` state.
 - Readiness fails when the most recent cycle was not clean, so the probe cannot
