@@ -1,0 +1,50 @@
+# ---- Python -----------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# ---- Virtual environments --------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ---- Test / tooling caches -------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# ---- Local runtime data (generated, never commit) ---------------------
+data/
+logs/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ---- Local configuration overrides ------------------------------------
+config.local.yaml
+
+# ---- Editors / OS ------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Development-only: jsdom for scripts/dashboard-render-check.js (never a runtime dependency)
+node_modules/

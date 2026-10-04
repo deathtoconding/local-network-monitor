@@ -1,0 +1,45 @@
+name: Feature request
+description: A question the monitor should answer but cannot
+title: "[feature] "
+labels: ["type/feature", "status/needs-info"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the **question** you want answered, not only the widget you want
+        built — it often leads to a simpler change. Requests outside the MVP
+        boundary in `docs/SPECIFICATION.md §2.3` will be closed with a pointer to
+        that section, not silently ignored.
+  - type: textarea
+    id: question
+    attributes:
+      label: What question are you trying to answer?
+      placeholder: "When did my backup job start using the network, and did it fail?"
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you work around it today?
+      placeholder: "I grep the log for HIGH_UPLOAD events and correlate by hand."
+    validations:
+      required: false
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would the ideal output look like?
+      description: An API response, a dashboard panel, an event type — sketch it.
+      render: json
+    validations:
+      required: false
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Project constraints
+      description: These are non-negotiable for the MVP; confirm your request respects them.
+      options:
+        - label: The change never claims per-process byte counts (ADR-0005)
+        - label: The change works without cloud services, containers, or authentication
+        - label: The change is measurable/verifiable, not best-effort inference
+    validations:
+      required: true

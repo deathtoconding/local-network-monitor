@@ -1,0 +1,257 @@
+name: CI
+
+# Quality gate for every change: lint, format, security lint, tests on Windows and
+# Linux across supported Python versions, coverage floor, package build, and a
+# smoke test of the CLI a user would actually run.
+#
+# Windows is in the matrix on purpose: it is the primary target platform and the
+# only one where the PowerShell connection collector is exercised.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - name: ruff check
+        run: python -m ruff check src tests --output-format=github
+      - name: ruff format --check
+        run: python -m ruff format --check src tests
+
+  test:
+    name: Tests (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    permissions:
+      contents: read
+      pull-requests: write  # post the failure report as a PR comment
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Install the package (validates packaging metadata too)
+        run: python -m pip install -e .
+      - name: Test suite with coverage floor
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest --cov=network_monitor --cov-report=term-missing \
+            --cov-report=xml --cov-fail-under=85 2>&1 | tee pytest-output.txt
+      # A red matrix should be diagnosable from the pull request itself, without
+      # opening logs per job. The report is edited in place, so repeated failures
+      # do not accumulate comments.
+      - name: Report test failures on the pull request
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "### Tests failed on ${{ matrix.os }} / Python ${{ matrix.python-version }}"
+            echo
+            echo "Failing tests:"
+            echo
+            echo '```'
+            grep -E "^(FAILED|ERROR)" pytest-output.txt | head -40 || true
+            echo '```'
+            echo
+            echo "<details><summary>Last 120 lines of output</summary>"
+            echo
+            echo '```'
+            tail -120 pytest-output.txt || true
+            echo '```'
+            echo
+            echo "</details>"
+          } > failure-report.md
+          gh pr comment "$PR_NUMBER" --body-file failure-report.md --edit-last --create-if-none
+      - name: Upload coverage artifact
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+      - name: CLI smoke test (config validation, then one real cycle)
+        shell: bash
+        run: |
+          python -m network_monitor --check-config
+          python -m network_monitor --once --config config.yaml
+
+  report-cleanup:
+    name: Clear stale failure report
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Only runs when the whole matrix passed: a green run must not leave a
+    # "Tests failed" comment behind, and a red run must not delete the diagnostic
+    # that a still-failing sibling job just wrote.
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Delete the CI failure report comment, if any
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          for id in $(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments?per_page=100" \
+                        --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | startswith("### Tests failed")) | .id'); do
+            gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$id" || true
+          done
+
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip pip-audit
+      - name: Audit runtime dependencies
+        run: python -m pip install -r requirements.txt && python -m pip_audit --strict
+
+  dashboard:
+    name: Dashboard render check
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: python -m pip install -e .
+      - name: Install the render-check's development dependency
+        run: npm install --no-save jsdom
+      - name: Start the monitor
+        run: |
+          set -euo pipefail
+          python -m network_monitor --host 127.0.0.1 --port 8127 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8127/api/health >/dev/null && break
+            sleep 1
+          done
+      - name: Render the real page against live data
+        env:
+          LNM_BASE_URL: http://127.0.0.1:8127
+        run: node scripts/dashboard-render-check.js
+      - name: Stop the monitor
+        if: always()
+        run: pkill -f "network_monitor --host 127.0.0.1 --port 8127" || true
+
+  package:
+    name: Build & verify distribution
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install build twine
+      - name: Build wheel and sdist
+        run: python -m build
+      - name: Check metadata
+        run: python -m twine check dist/*
+      - name: Verify the sdist carries the documentation
+        run: |
+          set -euo pipefail
+          # The sdist is the source of the project, not just the code: a reader
+          # must be able to build it and understand it from the same download.
+          #
+          # The listing is written to a file rather than piped into grep: with
+          # `set -o pipefail`, `tar | grep -q` fails the step even on a match,
+          # because grep exits at the first hit and tar then dies of SIGPIPE.
+          tar -tzf dist/*.tar.gz > sdist-contents.txt
+          missing=0
+          for required in docs/ARCHITECTURE.md docs/SLO.md docs/RUNBOOK.md docs/PLAN.md \
+                          docs/DASHBOARD.md docs/SPECIFICATION.md docs/adr/README.md \
+                          config.yaml CONTRIBUTING.md SECURITY.md CHANGELOG.md; do
+            if ! grep -q "/$required$" sdist-contents.txt; then
+              echo "::error::missing from sdist: $required"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "sdist documentation files: $(grep -c 'docs/.*\.md' sdist-contents.txt)"
+          echo "sdist documentation complete"
+      - name: Install the wheel in a clean environment and run it
+        run: |
+          python -m venv /tmp/verify
+          /tmp/verify/bin/python -m pip install dist/*.whl
+          /tmp/verify/bin/network-monitor --version
+          /tmp/verify/bin/python -c "import network_monitor; print(network_monitor.__version__)"
+      - name: Smoke-test the installed wheel as a service
+        run: |
+          # A wheel that serves the API but no dashboard is not a product, so the
+          # packaging gate starts the real thing and asks it for the real page.
+          # The config must be a real file: `--config /dev/null` is refused
+          # (Path.is_file() is false for a device node), which is correct
+          # behaviour and was itself caught by this job.
+          set -euo pipefail
+          mkdir -p /tmp/lnm-verify/data
+          cat > /tmp/lnm-verify/config.yaml <<'YAML'
+          monitor:
+            host: 127.0.0.1
+            port: 8123
+          database:
+            path: /tmp/lnm-verify/data/monitor.db
+          logging:
+            file: /tmp/lnm-verify/data/monitor.log
+          YAML
+          cd /tmp/lnm-verify
+          /tmp/verify/bin/network-monitor --config /tmp/lnm-verify/config.yaml &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8123/api/health >/dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8123/api/status >/dev/null
+          curl -sf http://127.0.0.1:8123/api/ready >/dev/null
+          curl -sf http://127.0.0.1:8123/api/metrics | grep -q lnm_up
+          curl -sf http://127.0.0.1:8123/ | grep -q "Local Network Monitor"
+          curl -sf http://127.0.0.1:8123/static/js/app.js >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error

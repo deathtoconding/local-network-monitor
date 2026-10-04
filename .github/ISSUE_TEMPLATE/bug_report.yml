@@ -1,0 +1,79 @@
+name: Bug report
+description: Something behaved incorrectly, crashed, or reported something untrue
+title: "[bug] "
+labels: ["type/bug", "status/needs-info"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The fastest path to a fix is evidence: the monitor
+        exposes almost everything needed for diagnosis.
+
+        **Security issues must not be reported here** — see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+      placeholder: "The dashboard showed 0 connections while `Get-NetTCPConnection` listed 42."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact commands and configuration that matter.
+      placeholder: |
+        1. `python -m network_monitor`
+        2. wait ~20 s
+        3. open /api/ready
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of /api/status
+      description: "`curl -s http://127.0.0.1:8000/api/status` (redact endpoints if needed)"
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: "`Get-Content logs\\monitor.log -Tail 50` — JSON layout preferred if configured"
+      render: shell
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`python -m network_monitor --version`"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: "OS and version, Python version, and whether the monitor ran elevated"
+      placeholder: "Windows 11 23H2, Python 3.12.4, not elevated"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: false
+      options:
+        - collectors (interface / connections / processes)
+        - storage (SQLite, retention)
+        - detection (rules, events)
+        - API
+        - dashboard
+        - notifications
+        - CLI / configuration
+        - CI / tooling
+        - not sure
+    validations:
+      required: true

@@ -1,0 +1,33 @@
+name: CodeQL
+
+# Static analysis for security defects. CodeQL is free for public repositories;
+# on a private repository this workflow only runs where GitHub Advanced Security
+# is enabled. If that is not the case, delete this file - the dependency audit and
+# the flake8-bandit rules in `ruff` still cover the common cases.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"  # weekly, Monday 04:23 UTC
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"

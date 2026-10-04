@@ -1,0 +1,85 @@
+name: Release
+
+# Tag-driven release: build the distributions, verify them, publish a GitHub
+# release with artifacts and the changelog section for that version.
+#
+# The project is not published to PyPI; the artifacts on the release page are the
+# supported download path. Publishing to PyPI is a deliberate future decision
+# (see docs/PLAN.md) because it would add another supply-chain surface.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip install build twine
+
+      - name: Verify the tag matches the packaged version
+        run: |
+          tag="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          version="v$(python -c 'import network_monitor, sys; sys.path.insert(0, "src"); print(network_monitor.__version__)')"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $tag does not match package version $version"
+            exit 1
+          fi
+
+      - name: Run the full test suite before releasing
+        run: python -m pytest --cov=network_monitor --cov-fail-under=85
+
+      - name: Build and check distributions
+        run: |
+          python -m build
+          python -m twine check dist/*
+
+      - name: Extract the changelog section for this version
+        id: changelog
+        run: |
+          version="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          python - "$version" <<'PY' > release-notes.md
+          import pathlib, sys
+
+          version = sys.argv[1].lstrip("v")
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          marker = f"## [{version}]"
+          if marker not in text:
+              print(f"See CHANGELOG.md for details of {version}.")
+              raise SystemExit(0)
+          section = text.split(marker, 1)[1]
+          body = section.split("\n## ", 1)[0]
+          print(marker + body.rstrip())
+          PY
+          cat release-notes.md
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          gh release create "$tag" dist/* \
+            --title "$tag" \
+            --notes-file release-notes.md \
+            --verify-tag

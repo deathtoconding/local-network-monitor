@@ -1,0 +1,34 @@
+version: 2
+updates:
+  # Runtime dependencies - four of them, deliberately, so each update is worth
+  # reading rather than rubber-stamping.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Amsterdam
+    open-pull-requests-limit: 5
+    labels: ["type/chore", "area/ops"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      runtime-deps:
+        patterns: ["fastapi*", "uvicorn*", "psutil", "PyYAML"]
+      dev-deps:
+        patterns: ["pytest*", "httpx", "ruff", "mypy", "build", "twine", "pip-audit", "pre-commit"]
+        update-types: ["minor", "patch"]
+
+  # Workflow actions are part of the supply chain: keep them current, reviewed
+  # like code because a compromised action runs with repository permissions.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Europe/Amsterdam
+    labels: ["type/chore", "sre/security"]
+    commit-message:
+      prefix: "chore(ci)"

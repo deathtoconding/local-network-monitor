@@ -1,0 +1,11 @@
+# Development / test dependencies for a fresh checkout.
+# Install:  python -m pip install -r requirements-dev.txt
+# Kept in sync with [project.optional-dependencies].dev in pyproject.toml.
+-r requirements.txt
+pytest>=7.4
+pytest-cov>=4.1
+httpx>=0.27
+ruff>=0.4
+build>=1.2
+twine>=5.0
+pip-audit>=2.7
