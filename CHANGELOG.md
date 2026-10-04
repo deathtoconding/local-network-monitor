@@ -8,7 +8,51 @@ Public API = the REST endpoints and the configuration file.
 
 ## [Unreleased]
 
+Nothing yet. Planned work is tracked in [docs/PLAN.md](docs/PLAN.md)
+(roadmap items LNM-101 through LNM-304) and filed as issues on the repository.
+
+## [0.1.0] - 2026-10-04
+
+The first public release: a local, single-machine network monitor that measures,
+explains and displays what this machine is doing on the network, together with
+the operability work - metrics, readiness, structured logging, CI/CD and the
+dashboard design system - that makes it safe to run unattended.
+
 ### Added
+
+- **Interface metering** (`psutil.net_io_counters`) with reset-safe
+  bytes-per-second rates: a decreasing counter discards the negative delta,
+  reports `0 B/s` and re-establishes the baseline.
+- **TCP connection collection** with owning PIDs, from `Get-NetTCPConnection`
+  (primary on Windows) with `psutil` and `netstat -ano` fallbacks, all normalised
+  to one model.
+- **Process attribution**: PID → name, executable, creation time, status, with a
+  short-lived cache and an explicit error taxonomy (`no_such_process`,
+  `access_denied`, `zombie`, `error`).
+- **SQLite storage** (WAL, auto-created schema, `PRAGMA user_version`) with
+  repositories for measurements, connections, processes, events and collector
+  health; history survives restarts.
+- **Six deterministic detection rules**: `HIGH_DOWNLOAD`, `HIGH_UPLOAD`,
+  `INTERFACE_ERROR` (counter deltas), `NEW_NETWORK_PROCESS`,
+  `CONNECTION_SPIKE` (rolling baseline), `COLLECTOR_FAILURE`, with per-subject
+  cooldowns and structured evidence.
+- **REST API** (`/api/status`, `/api/interfaces`, `/api/traffic`,
+  `/api/traffic/history`, `/api/connections`, `/api/processes`, `/api/events`,
+  `/api/events/{id}`, plus `/api/system` and `PATCH /api/events/{id}`) with
+  OpenAPI docs at `/api/docs`.
+- **Web dashboard** (no build step, no CDN): overview, traffic history chart,
+  interfaces table, processes & connections with filters, events feed with
+  click-through evidence.
+- **Notifications**: policy/transport split with a bounded queue and a worker
+  thread, so SMTP delivery can never block collection.
+- **Resilience**: every collector is isolated; failures are recorded per
+  collector and surfaced as `COLLECTOR_FAILURE` events, and the loop keeps
+  running.
+- **Retention**: age-based pruning for measurements and events, a shorter window
+  for connection snapshots, and size/row counters in `/api/status`.
+- **CLI**: `python -m network_monitor` with `--config`, `--host`, `--port`,
+  `--interval`, `--api-only`, `--once`, `--check-config`, `--log-level`,
+  `--version`; a Windows quick-start script at `scripts/run.ps1`.
 
 - **Observability**: `GET /api/metrics` (Prometheus text exposition, no client
   library), `GET /api/ready` (depth probe: database writable, loop fresh, last
@@ -93,47 +137,6 @@ Public API = the REST endpoints and the configuration file.
 - The dashboard assets lived outside the package, so an installed wheel served the
   API with no dashboard. They now ship inside `network_monitor/web/` and the CI
   packaging job fetches the real page from the installed wheel.
-
-## [0.1.0] - 2026-10-04
-
-Initial MVP: a local, single-machine network monitor that measures, explains and
-displays host network activity.
-
-### Added
-
-- **Interface metering** (`psutil.net_io_counters`) with reset-safe
-  bytes-per-second rates: a decreasing counter discards the negative delta,
-  reports `0 B/s` and re-establishes the baseline.
-- **TCP connection collection** with owning PIDs, from `Get-NetTCPConnection`
-  (primary on Windows) with `psutil` and `netstat -ano` fallbacks, all normalised
-  to one model.
-- **Process attribution**: PID → name, executable, creation time, status, with a
-  short-lived cache and an explicit error taxonomy (`no_such_process`,
-  `access_denied`, `zombie`, `error`).
-- **SQLite storage** (WAL, auto-created schema, `PRAGMA user_version`) with
-  repositories for measurements, connections, processes, events and collector
-  health; history survives restarts.
-- **Six deterministic detection rules**: `HIGH_DOWNLOAD`, `HIGH_UPLOAD`,
-  `INTERFACE_ERROR` (counter deltas), `NEW_NETWORK_PROCESS`,
-  `CONNECTION_SPIKE` (rolling baseline), `COLLECTOR_FAILURE`, with per-subject
-  cooldowns and structured evidence.
-- **REST API** (`/api/status`, `/api/interfaces`, `/api/traffic`,
-  `/api/traffic/history`, `/api/connections`, `/api/processes`, `/api/events`,
-  `/api/events/{id}`, plus `/api/system` and `PATCH /api/events/{id}`) with
-  OpenAPI docs at `/api/docs`.
-- **Web dashboard** (no build step, no CDN): overview, traffic history chart,
-  interfaces table, processes & connections with filters, events feed with
-  click-through evidence.
-- **Notifications**: policy/transport split with a bounded queue and a worker
-  thread, so SMTP delivery can never block collection.
-- **Resilience**: every collector is isolated; failures are recorded per
-  collector and surfaced as `COLLECTOR_FAILURE` events, and the loop keeps
-  running.
-- **Retention**: age-based pruning for measurements and events, a shorter window
-  for connection snapshots, and size/row counters in `/api/status`.
-- **CLI**: `python -m network_monitor` with `--config`, `--host`, `--port`,
-  `--interval`, `--api-only`, `--once`, `--check-config`, `--log-level`,
-  `--version`; a Windows quick-start script at `scripts/run.ps1`.
 
 [Unreleased]: https://github.com/deathtoconding/local-network-monitor/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/deathtoconding/local-network-monitor/releases/tag/v0.1.0
