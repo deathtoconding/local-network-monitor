@@ -146,18 +146,33 @@ jobs:
         run: |
           # A wheel that serves the API but no dashboard is not a product, so the
           # packaging gate starts the real thing and asks it for the real page.
-          cd /tmp
-          /tmp/verify/bin/network-monitor --host 127.0.0.1 --port 8123 --config /dev/null &
+          # The config must be a real file: `--config /dev/null` is refused
+          # (Path.is_file() is false for a device node), which is correct
+          # behaviour and was itself caught by this job.
+          set -euo pipefail
+          mkdir -p /tmp/lnm-verify/data
+          cat > /tmp/lnm-verify/config.yaml <<'YAML'
+          monitor:
+            host: 127.0.0.1
+            port: 8123
+          database:
+            path: /tmp/lnm-verify/data/monitor.db
+          logging:
+            file: /tmp/lnm-verify/data/monitor.log
+          YAML
+          cd /tmp/lnm-verify
+          /tmp/verify/bin/network-monitor --config /tmp/lnm-verify/config.yaml &
           SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:8123/api/health >/dev/null && break
             sleep 1
           done
           curl -sf http://127.0.0.1:8123/api/status >/dev/null
+          curl -sf http://127.0.0.1:8123/api/ready >/dev/null
           curl -sf http://127.0.0.1:8123/api/metrics | grep -q lnm_up
           curl -sf http://127.0.0.1:8123/ | grep -q "Local Network Monitor"
           curl -sf http://127.0.0.1:8123/static/js/app.js >/dev/null
-          kill $SERVER_PID
       - uses: actions/upload-artifact@v4
         with:
           name: dist
