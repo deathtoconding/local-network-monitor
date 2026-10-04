@@ -196,14 +196,23 @@ jobs:
           set -euo pipefail
           # The sdist is the source of the project, not just the code: a reader
           # must be able to build it and understand it from the same download.
+          #
+          # The listing is written to a file rather than piped into grep: with
+          # `set -o pipefail`, `tar | grep -q` fails the step even on a match,
+          # because grep exits at the first hit and tar then dies of SIGPIPE.
+          tar -tzf dist/*.tar.gz > sdist-contents.txt
+          missing=0
           for required in docs/ARCHITECTURE.md docs/SLO.md docs/RUNBOOK.md docs/PLAN.md \
                           docs/DASHBOARD.md docs/SPECIFICATION.md docs/adr/README.md \
                           config.yaml CONTRIBUTING.md SECURITY.md CHANGELOG.md; do
-            tar -tzf dist/*.tar.gz | grep -q "/$required$" \
-              || { echo "missing from sdist: $required"; exit 1; }
+            if ! grep -q "/$required$" sdist-contents.txt; then
+              echo "::error::missing from sdist: $required"
+              missing=1
+            fi
           done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "sdist documentation files: $(grep -c 'docs/.*\.md' sdist-contents.txt)"
           echo "sdist documentation complete"
-          tar -tzf dist/*.tar.gz | grep -c 'docs/.*\.md'
       - name: Install the wheel in a clean environment and run it
         run: |
           python -m venv /tmp/verify
