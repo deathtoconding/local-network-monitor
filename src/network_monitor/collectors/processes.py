@@ -38,7 +38,9 @@ class ProcessResolver(Collector[List[ProcessInfo]]):
     name = "processes"
 
     def __init__(self, cache_ttl_seconds: float = DEFAULT_CACHE_TTL_SECONDS) -> None:
-        self._cache_ttl = cache_ttl_seconds
+        #: ``0`` disables the cache; see :meth:`_from_cache` for why the
+        #: comparison is strict.
+        self._cache_ttl = max(0.0, cache_ttl_seconds)
         self._cache: Dict[int, tuple[float, ProcessInfo]] = {}
 
     # ---- collection --------------------------------------------------
@@ -117,11 +119,19 @@ class ProcessResolver(Collector[List[ProcessInfo]]):
 
     # ---- cache -------------------------------------------------------
     def _from_cache(self, pid: int) -> Optional[ProcessInfo]:
+        """Return a cached copy, or ``None`` when the entry is stale.
+
+        An entry is valid while ``age < cache_ttl_seconds``. The comparison is
+        deliberately strict: ``ttl = 0`` then means "do not cache", which stays
+        true on Windows, where ``time.monotonic()`` has ~15.6 ms granularity and
+        two back-to-back calls can both read the same tick (an ``age <= ttl``
+        check would serve a zero-TTL entry there but not on Linux).
+        """
         entry = self._cache.get(pid)
         if entry is None:
             return None
         stored_at, info = entry
-        if time.monotonic() - stored_at > self._cache_ttl:
+        if time.monotonic() - stored_at >= self._cache_ttl:
             self._cache.pop(pid, None)
             return None
         return ProcessInfo(**{**info.__dict__})

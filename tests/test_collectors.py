@@ -320,6 +320,8 @@ class TestProcessResolver:
         assert calls["count"] == 1
 
     def test_cache_ttl_expiry(self, monkeypatch):
+        # ttl = 0 disables the cache; this must hold on Windows too, where the
+        # monotonic clock has ~15.6 ms granularity (see ProcessResolver._from_cache).
         resolver = ProcessResolver(cache_ttl_seconds=0.0)
         original = psutil.Process
         calls = {"count": 0}

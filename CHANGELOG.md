@@ -44,6 +44,9 @@ Public API = the REST endpoints and the configuration file.
 
 ### Fixed
 
+- `ProcessResolver` treated a cache entry as valid when its age equalled the
+  TTL. Windows' coarse monotonic clock made that observable: a processor
+  cache configured with `cache_ttl_seconds = 0` still served entries.
 - A failed start against a corrupt database left its SQLite connection open,
   which on Windows blocked the documented recovery step of moving the file
   aside. `Database.connect()` and `build_state()` now release what they
