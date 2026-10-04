@@ -39,7 +39,8 @@ case "$task" in
                           "$PYTHON" -m network_monitor --check-config ;;
     run)      ensure_venv; shift || true; "$PYTHON" -m network_monitor "$@" ;;
     once)     ensure_venv; "$PYTHON" -m network_monitor --once ;;
+    api-only) ensure_venv; "$PYTHON" -m network_monitor --api-only --host 127.0.0.1 --port 8000 ;;
     build)    ensure_venv; "$PYTHON" -m build; "$PYTHON" -m twine check dist/* ;;
     audit)    ensure_venv; "$PYTHON" -m pip_audit ;;
-    *)        echo "Usage: $0 {setup|test|cov|lint|format|check|run|once|build|audit}" ;;
+    *)        echo "Usage: $0 {setup|test|cov|lint|format|check|run|once|api-only|build|audit}" ;;
 esac

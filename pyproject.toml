@@ -31,9 +31,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Everything CI and the dev scripts need: `pip install -e ".[dev]"`.
+# Keep this list in sync with requirements-dev.txt - CI installs that file, and
+# a missing test plugin there fails the whole matrix (it happened: pytest-cov).
 dev = [
     "pytest>=7.4",
+    "pytest-cov>=4.1",
     "httpx>=0.27",
+    "ruff>=0.4",
+    "build>=1.2",
+    "twine>=5.0",
+    "pip-audit>=2.7",
 ]
 
 [project.scripts]

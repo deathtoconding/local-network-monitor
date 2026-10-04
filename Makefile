@@ -53,7 +53,7 @@ api-only: ## Serve the dashboard without collecting
 	$(BIN)/python -m network_monitor --api-only
 
 audit: ## Audit dependencies for known vulnerabilities
-	$(BIN)/python -m pip_audit || $(BIN)/python -m pip install pip-audit && $(BIN)/python -m pip_audit
+	$(BIN)/python -m pip_audit --strict
 
 build: ## Build the wheel and sdist, and verify the metadata
 	$(BIN)/python -m build
