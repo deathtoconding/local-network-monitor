@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local Network Monitor</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" id="status-dot" aria-hidden="true"></span>
+      <div>
+        <h1>Local Network Monitor</h1>
+        <p class="subtitle" id="subtitle">connecting&hellip;</p>
+      </div>
+    </div>
+    <div class="controls">
+      <label class="control">
+        Refresh
+        <select id="refresh-interval">
+          <option value="1000">1 s</option>
+          <option value="2000" selected>2 s</option>
+          <option value="5000">5 s</option>
+          <option value="0">paused</option>
+        </select>
+      </label>
+      <button id="refresh-now" class="button" type="button">Refresh now</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- A. Overview -->
+    <section class="card overview" aria-labelledby="overview-title">
+      <h2 id="overview-title">Network status</h2>
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">Health</span>
+          <span class="metric-value" id="metric-status">&mdash;</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Download</span>
+          <span class="metric-value accent-down" id="metric-download">&mdash;</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Upload</span>
+          <span class="metric-value accent-up" id="metric-upload">&mdash;</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Active TCP</span>
+          <span class="metric-value" id="metric-connections">&mdash;</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Events (24 h)</span>
+          <span class="metric-value" id="metric-events">&mdash;</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Uptime</span>
+          <span class="metric-value" id="metric-uptime">&mdash;</span>
+        </div>
+      </div>
+      <ul class="collector-list" id="collector-list"></ul>
+    </section>
+
+    <!-- Traffic chart -->
+    <section class="card" aria-labelledby="traffic-title">
+      <h2 id="traffic-title">Traffic history</h2>
+      <div class="chart-wrap">
+        <canvas id="traffic-chart" height="180" aria-label="Traffic history chart"></canvas>
+        <div class="chart-legend">
+          <span class="legend legend-down">download</span>
+          <span class="legend legend-up">upload</span>
+          <span class="legend-note" id="chart-note">last 15 minutes</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- B. Interfaces -->
+    <section class="card" aria-labelledby="interfaces-title">
+      <h2 id="interfaces-title">Interfaces</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Interface</th>
+              <th scope="col">State</th>
+              <th scope="col" class="num">Download</th>
+              <th scope="col" class="num">Upload</th>
+              <th scope="col" class="num">Received</th>
+              <th scope="col" class="num">Sent</th>
+              <th scope="col" class="num">Errors / Drops</th>
+            </tr>
+          </thead>
+          <tbody id="interfaces-body">
+            <tr><td colspan="7" class="empty">no data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- C. Processes / connections -->
+    <section class="card" aria-labelledby="connections-title">
+      <div class="card-head">
+        <h2 id="connections-title">Processes &amp; connections</h2>
+        <div class="filters">
+          <input id="filter-process" type="search" placeholder="filter process&hellip;" aria-label="Filter by process" />
+          <input id="filter-remote" type="search" placeholder="filter remote&hellip;" aria-label="Filter by remote endpoint" />
+          <select id="filter-state" aria-label="Filter by TCP state">
+            <option value="">all states</option>
+            <option value="ESTABLISHED">ESTABLISHED</option>
+            <option value="LISTEN">LISTEN</option>
+            <option value="TIME_WAIT">TIME_WAIT</option>
+            <option value="CLOSE_WAIT">CLOSE_WAIT</option>
+            <option value="SYN_SENT">SYN_SENT</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Process</th>
+              <th scope="col" class="num">PID</th>
+              <th scope="col">Local</th>
+              <th scope="col">Remote</th>
+              <th scope="col">State</th>
+            </tr>
+          </thead>
+          <tbody id="connections-body">
+            <tr><td colspan="5" class="empty">no data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="footnote">
+        Connections are attributed to the owning PID. Traffic figures are measured per
+        interface &mdash; this dashboard does not claim exact per-process byte counts.
+      </p>
+    </section>
+
+    <!-- D. Events -->
+    <section class="card" aria-labelledby="events-title">
+      <div class="card-head">
+        <h2 id="events-title">Events</h2>
+        <div class="filters">
+          <select id="filter-severity" aria-label="Filter by severity">
+            <option value="">all severities</option>
+            <option value="critical">critical</option>
+            <option value="warning">warning</option>
+            <option value="info">info</option>
+          </select>
+        </div>
+      </div>
+      <ul class="event-list" id="events-body">
+        <li class="empty">no events yet</li>
+      </ul>
+    </section>
+
+    <footer class="footer">
+      <span id="footer-status">Local Network Monitor</span>
+      <span><a href="/api/docs">API docs</a> &middot; <a href="/api/status">/api/status</a></span>
+    </footer>
+  </main>
+
+  <!-- Event detail dialog -->
+  <dialog id="event-dialog">
+    <article>
+      <header>
+        <h3 id="dialog-title">Event</h3>
+        <button id="dialog-close" type="button" class="button ghost" aria-label="Close">&times;</button>
+      </header>
+      <p id="dialog-meta" class="dialog-meta"></p>
+      <p id="dialog-description"></p>
+      <h4>Evidence</h4>
+      <pre id="dialog-evidence"></pre>
+    </article>
+  </dialog>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
