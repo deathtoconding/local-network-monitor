@@ -36,16 +36,23 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -r requirements-dev.txt
+          # Install the package itself: the version check, the test suite and the
+          # distribution build all need it, and doing it here means a broken
+          # pyproject aborts the release before anything is published.
+          python -m pip install -e .
           python -m pip install build twine
 
       - name: Verify the tag matches the packaged version
         run: |
-          tag="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
-          version="v$(python -c 'import network_monitor, sys; sys.path.insert(0, "src"); print(network_monitor.__version__)')"
+          # On a tag push, github.ref_name is the tag. On a manual dispatch it is
+          # the branch that was selected, so the input has to win there.
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="v$(python -c 'import sys; sys.path.insert(0, "src"); import network_monitor; print(network_monitor.__version__)')"
           if [ "$tag" != "$version" ]; then
             echo "::error::tag $tag does not match package version $version"
             exit 1
           fi
+          echo "releasing $tag (packaged version $version)"
 
       - name: Run the full test suite before releasing
         run: python -m pytest --cov=network_monitor --cov-fail-under=85
@@ -58,7 +65,7 @@ jobs:
       - name: Extract the changelog section for this version
         id: changelog
         run: |
-          version="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          version="${{ inputs.tag || github.ref_name }}"
           python - "$version" <<'PY' > release-notes.md
           import pathlib, sys
 
@@ -78,7 +85,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
+          tag="${{ inputs.tag || github.ref_name }}"
           gh release create "$tag" dist/* \
             --title "$tag" \
             --notes-file release-notes.md \

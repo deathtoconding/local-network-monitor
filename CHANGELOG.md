@@ -110,6 +110,12 @@ dashboard design system - that makes it safe to run unattended.
 
 ### Fixed
 
+- The release workflow failed before building anything: it verified the tag
+  against `network_monitor.__version__` with an import ordered before `src` was
+  added to `sys.path`, and the job never installed the package, so the "version"
+  it compared was a traceback. It now installs the package first, resolves the
+  version correctly with or without an install, and prefers the manual-dispatch
+  tag input over the branch name it was previously reading.
 - The source distribution shipped the code and the tests but not the
   documentation: no `docs/`, no `config.yaml`, no `CONTRIBUTING.md`/`SECURITY.md`.
   `MANIFEST.in` now carries the full documentation set, the sample configuration
