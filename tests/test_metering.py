@@ -102,9 +102,7 @@ class TestInterfaceCollector:
         assert measurements[0].bytes_sent == 100
 
     def test_second_cycle_produces_rates(self, monkeypatch):
-        timestamps = iter(
-            [T0, T0 + timedelta(seconds=2)]
-        )
+        timestamps = iter([T0, T0 + timedelta(seconds=2)])
         collector = self._collector(
             monkeypatch,
             [{"eth0": fake_counter(1_000, 2_000)}, {"eth0": fake_counter(3_000, 6_000)}],
@@ -134,13 +132,7 @@ class TestInterfaceCollector:
     def test_errors_and_drops_are_carried_through(self, monkeypatch):
         collector = self._collector(
             monkeypatch,
-            [
-                {
-                    "eth0": fake_counter(
-                        1, 2, errin=3, errout=4, dropin=5, dropout=6
-                    )
-                }
-            ],
+            [{"eth0": fake_counter(1, 2, errin=3, errout=4, dropin=5, dropout=6)}],
         )
         measurement = collector.collect()[0]
         assert (measurement.errors_in, measurement.errors_out) == (3, 4)
@@ -157,7 +149,9 @@ class TestInterfaceCollector:
 
     def test_no_interfaces_raises_collector_error(self, monkeypatch):
         collector = InterfaceCollector(MonitorSection(exclude_interfaces=["lo"]))
-        monkeypatch.setattr("psutil.net_io_counters", lambda pernic=True: {"lo": fake_counter(1, 1)})
+        monkeypatch.setattr(
+            "psutil.net_io_counters", lambda pernic=True: {"lo": fake_counter(1, 1)}
+        )
         with pytest.raises(CollectorError):
             collector.collect()
 

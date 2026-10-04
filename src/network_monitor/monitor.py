@@ -69,7 +69,9 @@ class Monitor:
             self.state.notifications.start()
         self._thread = threading.Thread(target=self.run_forever, name="monitor-loop", daemon=True)
         self._thread.start()
-        logger.info("monitoring loop started (interval %.2fs)", self.config.monitor.collection_interval)
+        logger.info(
+            "monitoring loop started (interval %.2fs)", self.config.monitor.collection_interval
+        )
 
     def stop(self, timeout: float = 5.0) -> None:
         """Signal the loop to stop and wait for it to finish."""
@@ -129,16 +131,12 @@ class Monitor:
         errors: List[str] = []
 
         # 1. COLLECT ---------------------------------------------------
-        measurements, error = self._safe_collect(
-            "interface", self.interface_collector.collect
-        )
+        measurements, error = self._safe_collect("interface", self.interface_collector.collect)
         if error:
             errors.append(f"interface: {error}")
         measurements = measurements or []
 
-        connections, error = self._safe_collect(
-            "connections", self.connection_collector.collect
-        )
+        connections, error = self._safe_collect("connections", self.connection_collector.collect)
         if error:
             errors.append(f"connections: {error}")
         connections = connections or []
@@ -229,7 +227,9 @@ class Monitor:
             data = func()
         except Exception as exc:  # noqa: BLE001 - this is the isolation boundary
             duration_ms = (time.monotonic() - started) * 1000
-            message = str(exc) if isinstance(exc, CollectorError) else f"{type(exc).__name__}: {exc}"
+            message = (
+                str(exc) if isinstance(exc, CollectorError) else f"{type(exc).__name__}: {exc}"
+            )
             self.state.health.record_failure(name, timestamp, message, duration_ms)
             logger.warning("collector '%s' failed: %s", name, message)
             return None, message
@@ -327,4 +327,3 @@ class Monitor:
                 logger.debug("prune of %s failed", table, exc_info=True)
         if deleted:
             logger.info("retention policy removed %d stale row(s)", deleted)
-

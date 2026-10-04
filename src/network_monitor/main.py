@@ -68,7 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--check-config", action="store_true", help="validate configuration and exit"
     )
-    parser.add_argument("--version", action="version", version=f"local-network-monitor {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"local-network-monitor {__version__}"
+    )
     return parser
 
 
@@ -150,8 +152,10 @@ def run_single_cycle(config: Config) -> int:
     for event in events:
         print(f"  - {event.summary_line()}")
     print()
-    print(f" Totals: down {traffic.download_bytes_per_second:,.0f} B/s  "
-          f"up {traffic.upload_bytes_per_second:,.0f} B/s")
+    print(
+        f" Totals: down {traffic.download_bytes_per_second:,.0f} B/s  "
+        f"up {traffic.upload_bytes_per_second:,.0f} B/s"
+    )
     print(f" Stored in {config.database.path}")
     state.database.close()
     return 0
@@ -263,7 +267,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         return run_dashboard(config, api_only=args.api_only)
     except OSError as exc:
-        print(f"cannot start dashboard on {config.monitor.host}:{config.monitor.port}: {exc}", file=sys.stderr)
+        print(
+            f"cannot start dashboard on {config.monitor.host}:{config.monitor.port}: {exc}",
+            file=sys.stderr,
+        )
         return 1
     except Exception:  # noqa: BLE001
         logger.exception("fatal error")

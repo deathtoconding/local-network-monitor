@@ -113,7 +113,10 @@ class TestCycle:
 
         assert monitor.state.measurements.count() == 1
         assert monitor.state.connections.latest_count() == 1
-        assert [event.event_type.value for event in events] == ["HIGH_DOWNLOAD", "NEW_NETWORK_PROCESS"]
+        assert [event.event_type.value for event in events] == [
+            "HIGH_DOWNLOAD",
+            "NEW_NETWORK_PROCESS",
+        ]
         assert monitor.state.events.count() == 2
         # The event id is assigned during persistence, so notifications can
         # reference a stored event.
@@ -171,7 +174,9 @@ class TestResilience:
         # Pretend the connection collector last succeeded well beyond the timeout.
         all_events = []
         for _ in range(3):
-            monitor.state.health.ensure("connections").last_success = utc_now() - timedelta(minutes=5)
+            monitor.state.health.ensure("connections").last_success = utc_now() - timedelta(
+                minutes=5
+            )
             all_events.extend(monitor.cycle())
 
         assert monitor.state.health.get("connections").state == "failed"

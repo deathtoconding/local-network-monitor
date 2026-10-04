@@ -74,7 +74,9 @@ class TestInterfaceMeasurementRepository:
     def test_latest_per_interface_returns_newest_row_only(self, database):
         repository = InterfaceMeasurementRepository(database)
         now = utc_now()
-        make_history(database, "Ethernet", [1000.0, 2000.0, 3000.0], start=now - timedelta(seconds=3))
+        make_history(
+            database, "Ethernet", [1000.0, 2000.0, 3000.0], start=now - timedelta(seconds=3)
+        )
         latest = repository.latest_per_interface()
         assert len(latest) == 1
         assert latest[0].download_rate == pytest.approx(3000.0)
@@ -140,8 +142,12 @@ class TestConnectionRepository:
         now = utc_now()
         repository.add_snapshot(
             [
-                make_connection(pid=10, process_name="chrome.exe", state_name="ESTABLISHED", timestamp=now),
-                make_connection(pid=11, process_name="svchost.exe", state_name="LISTEN", timestamp=now),
+                make_connection(
+                    pid=10, process_name="chrome.exe", state_name="ESTABLISHED", timestamp=now
+                ),
+                make_connection(
+                    pid=11, process_name="svchost.exe", state_name="LISTEN", timestamp=now
+                ),
             ]
         )
         assert len(repository.search(process="chrome")) == 1
@@ -198,7 +204,11 @@ class TestEventRepository:
             severity=EventSeverity.WARNING,
             title="High network usage",
             description="Download traffic exceeded configured threshold.",
-            evidence={"interface": "Ethernet", "download_rate": 18_400_000, "threshold": 10_000_000},
+            evidence={
+                "interface": "Ethernet",
+                "download_rate": 18_400_000,
+                "threshold": 10_000_000,
+            },
         )
         event_id = repository.add(event)
         assert event.id == event_id

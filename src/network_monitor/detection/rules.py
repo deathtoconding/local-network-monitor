@@ -201,8 +201,7 @@ class InterfaceErrorRule(Rule):
             }
             if previous is not None:
                 deltas = {
-                    key: max(0, current[key] - previous.get(key, current[key]))
-                    for key in current
+                    key: max(0, current[key] - previous.get(key, current[key])) for key in current
                 }
                 total = sum(deltas.values())
                 if total > 0:
@@ -309,7 +308,9 @@ class ConnectionSpikeRule(Rule):
         # Attribute the spike to the processes that grew the most, if known.
         per_process: Dict[str, int] = {}
         for connection in context.connections:
-            key = connection.process_name or (f"PID {connection.pid}" if connection.pid else "unknown")
+            key = connection.process_name or (
+                f"PID {connection.pid}" if connection.pid else "unknown"
+            )
             per_process[key] = per_process.get(key, 0) + 1
         top = sorted(per_process.items(), key=lambda item: item[1], reverse=True)[:5]
 
@@ -326,7 +327,9 @@ class ConnectionSpikeRule(Rule):
                     "baseline_connections": round(baseline, 2),
                     "multiplier": multiplier,
                     "observed_ratio": round(current / baseline, 2),
-                    "top_processes": [{"process": name, "connections": count} for name, count in top],
+                    "top_processes": [
+                        {"process": name, "connections": count} for name, count in top
+                    ],
                 },
             )
         ]

@@ -358,8 +358,7 @@ class EventRepository:
     def recent_by_type(self, event_type: EventType | str, since: datetime) -> List[Event]:
         value = event_type.value if isinstance(event_type, EventType) else str(event_type)
         rows = self._db.query(
-            "SELECT * FROM events WHERE event_type = ? AND timestamp >= ? "
-            "ORDER BY timestamp DESC",
+            "SELECT * FROM events WHERE event_type = ? AND timestamp >= ? ORDER BY timestamp DESC",
             (value, to_iso(since)),
         )
         return [Event.from_row(row) for row in rows]
@@ -374,9 +373,7 @@ class EventRepository:
                 or 0
             )
         return int(
-            self._db.scalar(
-                "SELECT COUNT(*) FROM events WHERE timestamp >= ?", (to_iso(since),)
-            )
+            self._db.scalar("SELECT COUNT(*) FROM events WHERE timestamp >= ?", (to_iso(since),))
             or 0
         )
 
@@ -385,23 +382,39 @@ class EventRepository:
 
     def update_status(self, event_id: int, status: EventStatus | str) -> bool:
         value = status.value if isinstance(status, EventStatus) else str(status).lower()
-        cursor = self._db.execute(
-            "UPDATE events SET status = ? WHERE id = ?", (value, event_id)
-        )
+        cursor = self._db.execute("UPDATE events SET status = ? WHERE id = ?", (value, event_id))
         changed = cursor.rowcount > 0
         cursor.close()
         return changed
 
     def severity_counts(self, since: datetime) -> Dict[str, int]:
         rows = self._db.query(
-            "SELECT severity, COUNT(*) AS total FROM events WHERE timestamp >= ? "
-            "GROUP BY severity",
+            "SELECT severity, COUNT(*) AS total FROM events WHERE timestamp >= ? GROUP BY severity",
             (to_iso(since),),
         )
         return {row["severity"]: int(row["total"]) for row in rows}
 
     def latest(self, limit: int = 10) -> List[Event]:
         return self.list(limit=limit)
+
+    def counts_by_type_and_severity(self) -> List[Dict[str, Any]]:
+        """Lifetime event counts grouped by type and severity.
+
+        Used by the metrics endpoint: 6 event types x 3 severities keeps the
+        label cardinality bounded, which is what makes it safe to export.
+        """
+        rows = self._db.query(
+            "SELECT event_type, severity, COUNT(*) AS total FROM events "
+            "GROUP BY event_type, severity ORDER BY event_type, severity"
+        )
+        return [
+            {
+                "event_type": row["event_type"],
+                "severity": row["severity"],
+                "total": int(row["total"]),
+            }
+            for row in rows
+        ]
 
 
 class CollectorHealthRepository:

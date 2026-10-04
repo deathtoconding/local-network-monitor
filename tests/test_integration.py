@@ -32,7 +32,9 @@ class TestVerticalSlice:
 
         monitor = build_monitor(
             config,
-            FakeInterfaceCollector([[make_measurement(interface="Ethernet", download_rate=18_400_000.0)]]),
+            FakeInterfaceCollector(
+                [[make_measurement(interface="Ethernet", download_rate=18_400_000.0)]]
+            ),
             FakeConnectionCollector([]),
         )
         monitor.cycle()
@@ -41,7 +43,9 @@ class TestVerticalSlice:
         with TestClient(app) as client:
             traffic = client.get("/api/traffic").json()
             assert traffic["download_bytes_per_second"] == pytest.approx(18_400_000.0)
-            assert traffic["interfaces"]["Ethernet"]["download_bytes_per_second"] == pytest.approx(18_400_000.0)
+            assert traffic["interfaces"]["Ethernet"]["download_bytes_per_second"] == pytest.approx(
+                18_400_000.0
+            )
 
             history = client.get("/api/traffic/history").json()
             assert history["count"] == 1
@@ -62,9 +66,19 @@ class TestVerticalSlice:
             process_collector=type(
                 "Resolver",
                 (),
-                {"collect": lambda self: [], "resolve": lambda self, pid: type(
-                    "Info", (), {"pid": pid, "name": "chrome.exe", "error": None, "executable": "C:/chrome.exe"}
-                )()},
+                {
+                    "collect": lambda self: [],
+                    "resolve": lambda self, pid: type(
+                        "Info",
+                        (),
+                        {
+                            "pid": pid,
+                            "name": "chrome.exe",
+                            "error": None,
+                            "executable": "C:/chrome.exe",
+                        },
+                    )(),
+                },
             )(),
         )
         monitor.cycle()
@@ -132,7 +146,9 @@ class TestVerticalSlice:
             assert "access denied" in status["collectors"]["connections"]["last_error"]
             # Interface metering is unaffected.
             assert status["collectors"]["interface"]["state"] == "healthy"
-            assert client.get("/api/traffic").json()["download_bytes_per_second"] == pytest.approx(1000.0)
+            assert client.get("/api/traffic").json()["download_bytes_per_second"] == pytest.approx(
+                1000.0
+            )
         monitor.state.database.close()
 
 

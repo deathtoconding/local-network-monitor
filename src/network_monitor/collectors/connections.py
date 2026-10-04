@@ -107,7 +107,9 @@ class ConnectionCollector(Collector[List[NetworkConnection]]):
             return connections
 
         raise CollectorError(
-            "all connection sources failed: " + "; ".join(errors) if errors else "no source available",
+            "all connection sources failed: " + "; ".join(errors)
+            if errors
+            else "no source available",
             collector=self.name,
         )
 
@@ -382,7 +384,9 @@ def parse_csv_connections(payload: str, timestamp) -> List[NetworkConnection]:
                     remote_address=normalised.get("RemoteAddress", ""),
                     remote_port=int(normalised.get("RemotePort") or 0),
                     state=normalised.get("State", "UNKNOWN").upper(),
-                    pid=int(normalised["OwningProcess"]) if normalised.get("OwningProcess") else None,
+                    pid=int(normalised["OwningProcess"])
+                    if normalised.get("OwningProcess")
+                    else None,
                 )
             )
         except (TypeError, ValueError):

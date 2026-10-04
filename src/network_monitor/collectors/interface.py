@@ -112,7 +112,9 @@ class InterfaceCollector(Collector[List[InterfaceMeasurement]]):
             stats = psutil.net_if_stats()
             addresses = psutil.net_if_addrs()
         except Exception as exc:  # pragma: no cover - platform dependent
-            raise CollectorError(f"cannot enumerate interfaces: {exc}", collector=self.name) from exc
+            raise CollectorError(
+                f"cannot enumerate interfaces: {exc}", collector=self.name
+            ) from exc
 
         interfaces: List[InterfaceInfo] = []
         for name in sorted(stats.keys() | addresses.keys()):

@@ -55,7 +55,9 @@ class ProcessResolver(Collector[List[ProcessInfo]]):
                 "access denied while enumerating connection owners", collector=self.name
             ) from exc
         except Exception as exc:  # pragma: no cover - platform dependent
-            raise CollectorError(f"cannot enumerate connection owners: {exc}", collector=self.name) from exc
+            raise CollectorError(
+                f"cannot enumerate connection owners: {exc}", collector=self.name
+            ) from exc
 
         pids = sorted({c.pid for c in connections if c.pid})
         return self.resolve_many(pids)
@@ -145,9 +147,7 @@ def _from_epoch(epoch_seconds: float):
     return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
 
 
-def attach_process_names(
-    connections: List["object"], resolver: ProcessResolver
-) -> List["object"]:
+def attach_process_names(connections: List["object"], resolver: ProcessResolver) -> List["object"]:
     """Fill ``process_name`` on every connection in place, returning the list."""
     for connection in connections:
         pid = getattr(connection, "pid", None)

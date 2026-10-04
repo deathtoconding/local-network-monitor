@@ -55,7 +55,9 @@ class TestHighDownloadRule:
 
     def test_zero_threshold_disables_the_rule(self):
         rule = HighDownloadRule(DetectionSection(download_threshold_mbps=0))
-        assert rule.evaluate(context(measurements=[make_measurement(download_rate=999 * MBPS)])) == []
+        assert (
+            rule.evaluate(context(measurements=[make_measurement(download_rate=999 * MBPS)])) == []
+        )
 
     def test_missing_rate_is_ignored(self):
         rule = HighDownloadRule(DetectionSection(download_threshold_mbps=1))
@@ -101,9 +103,7 @@ class TestInterfaceErrorRule:
     def test_delta_raises_an_event(self):
         rule = InterfaceErrorRule()
         rule.evaluate(context(measurements=[make_measurement(errors_in=5, drops_out=0)]))
-        events = rule.evaluate(
-            context(measurements=[make_measurement(errors_in=8, drops_out=2)])
-        )
+        events = rule.evaluate(context(measurements=[make_measurement(errors_in=8, drops_out=2)]))
         assert len(events) == 1
         assert events[0].event_type is EventType.INTERFACE_ERROR
         assert events[0].evidence["deltas"]["errors_in"] == 3
@@ -130,10 +130,7 @@ class TestNewNetworkProcessRule:
     def test_known_pid_is_silent(self):
         rule = NewNetworkProcessRule(DetectionSection())
         assert (
-            rule.evaluate(
-                context(connections=[make_connection(pid=8420)], seen_pids={8420})
-            )
-            == []
+            rule.evaluate(context(connections=[make_connection(pid=8420)], seen_pids={8420})) == []
         )
 
     def test_rule_can_be_disabled(self):
@@ -168,8 +165,10 @@ class TestConnectionSpikeRule:
     def test_small_absolute_numbers_do_not_trigger(self):
         rule = ConnectionSpikeRule(DetectionSection(connection_spike_multiplier=3))
         events = rule.evaluate(
-            context(connections=[make_connection(pid=index) for index in range(1, 7)],
-                    connection_baseline=2.0)
+            context(
+                connections=[make_connection(pid=index) for index in range(1, 7)],
+                connection_baseline=2.0,
+            )
         )
         assert events == []
 

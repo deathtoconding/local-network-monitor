@@ -160,9 +160,27 @@ class Database:
     def table_counts(self) -> dict[str, int]:
         """Row counts per table - handy for /api/status and tests."""
         tables = ("interface_measurements", "connections", "processes", "events")
-        return {
-            table: int(self.scalar(f"SELECT COUNT(*) FROM {table}") or 0) for table in tables
-        }
+        return {table: int(self.scalar(f"SELECT COUNT(*) FROM {table}") or 0) for table in tables}
 
     def schema_version(self) -> int:
         return int(self.scalar("PRAGMA user_version") or 0)
+
+    def size_bytes(self) -> int:
+        """On-disk size of the database, WAL included (0 for :memory:)."""
+        total = 0
+        for suffix in ("", "-wal", "-shm"):
+            candidate = Path(f"{self.path}{suffix}")
+            try:
+                if candidate.is_file():
+                    total += candidate.stat().st_size
+            except OSError:  # pragma: no cover - race with a concurrent prune
+                continue
+        return total
+
+    def is_writable(self) -> bool:
+        """Cheap liveness check used by the readiness probe."""
+        try:
+            self.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
+            return True
+        except sqlite3.Error:
+            return False

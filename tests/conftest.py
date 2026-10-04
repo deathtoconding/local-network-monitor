@@ -118,7 +118,9 @@ def make_connection(
     )
 
 
-def make_history(database: Database, interface: str, rates: list[float], start: datetime | None = None):
+def make_history(
+    database: Database, interface: str, rates: list[float], start: datetime | None = None
+):
     """Insert a series of measurements (one per second) into the database."""
     from network_monitor.storage import InterfaceMeasurementRepository
 

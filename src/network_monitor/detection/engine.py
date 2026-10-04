@@ -114,9 +114,7 @@ class DetectionEngine:
         # A PID is "seen" as soon as it has been evaluated, whether or not the
         # event survived the cooldown filter, otherwise suppression would make
         # the same process look new on every cycle.
-        self._seen_pids.update(
-            int(c.pid) for c in context.connections if c.pid is not None
-        )
+        self._seen_pids.update(int(c.pid) for c in context.connections if c.pid is not None)
         self._connection_history.append(len(context.connections))
 
         events = self._apply_cooldown(candidates, timestamp)
@@ -137,7 +135,9 @@ class DetectionEngine:
         cutoff = timestamp - timedelta(seconds=window)
         # Drop bookkeeping for keys that expired long ago.
         self._last_emitted = {
-            key: seen for key, seen in self._last_emitted.items() if seen >= cutoff - timedelta(seconds=window)
+            key: seen
+            for key, seen in self._last_emitted.items()
+            if seen >= cutoff - timedelta(seconds=window)
         }
 
         emitted: List[Event] = []

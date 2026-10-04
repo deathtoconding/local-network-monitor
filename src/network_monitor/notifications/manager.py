@@ -100,9 +100,7 @@ class NotificationManager:
         if self._worker is not None and self._worker.is_alive():
             return
         self._stop.clear()
-        self._worker = threading.Thread(
-            target=self._run, name="notifications", daemon=True
-        )
+        self._worker = threading.Thread(target=self._run, name="notifications", daemon=True)
         self._worker.start()
         logger.info("notification worker started (%d notifier(s))", len(self.notifiers))
 
@@ -188,7 +186,9 @@ class NotificationManager:
                 delivered = bool(notifier.send(event))
             except Exception as exc:  # noqa: BLE001 - notifiers must never raise
                 detail = f"{type(exc).__name__}: {exc}"
-                logger.exception("notifier %s raised while sending event %s", notifier.name, event.id)
+                logger.exception(
+                    "notifier %s raised while sending event %s", notifier.name, event.id
+                )
             record = NotificationRecord(
                 timestamp=event.timestamp,
                 event_id=event.id,
