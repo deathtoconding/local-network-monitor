@@ -44,6 +44,9 @@ jobs:
     name: Tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     needs: lint
+    permissions:
+      contents: read
+      pull-requests: write  # post the failure report as a PR comment
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +62,39 @@ jobs:
       - name: Install the package (validates packaging metadata too)
         run: python -m pip install -e .
       - name: Test suite with coverage floor
-        run: python -m pytest --cov=network_monitor --cov-report=term-missing --cov-report=xml --cov-fail-under=85
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest --cov=network_monitor --cov-report=term-missing \
+            --cov-report=xml --cov-fail-under=85 2>&1 | tee pytest-output.txt
+      # A red matrix should be diagnosable from the pull request itself, without
+      # opening logs per job. The report is edited in place, so repeated failures
+      # do not accumulate comments.
+      - name: Report test failures on the pull request
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "### Tests failed on ${{ matrix.os }} / Python ${{ matrix.python-version }}"
+            echo
+            echo "Failing tests:"
+            echo
+            echo '```'
+            grep -E "^(FAILED|ERROR)" pytest-output.txt | head -40 || true
+            echo '```'
+            echo
+            echo "<details><summary>Last 120 lines of output</summary>"
+            echo
+            echo '```'
+            tail -120 pytest-output.txt || true
+            echo '```'
+            echo
+            echo "</details>"
+          } > failure-report.md
+          gh pr comment "$PR_NUMBER" --body-file failure-report.md --edit-last --create-if-none
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
