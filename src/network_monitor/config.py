@@ -112,9 +112,7 @@ class DetectionSection:
         if self.connection_spike_min_baseline < 1:
             raise ConfigError("detection.connection_spike_min_baseline must be >= 1")
         if self.collector_failure_timeout_seconds <= 0:
-            raise ConfigError(
-                "detection.collector_failure_timeout_seconds must be > 0"
-            )
+            raise ConfigError("detection.collector_failure_timeout_seconds must be > 0")
         if self.event_cooldown_seconds < 0:
             raise ConfigError("detection.event_cooldown_seconds must be >= 0")
 
@@ -152,9 +150,7 @@ class NotificationsSection:
     def __post_init__(self) -> None:
         allowed = {"info", "warning", "critical"}
         if self.min_severity.lower() not in allowed:
-            raise ConfigError(
-                f"notifications.min_severity must be one of {sorted(allowed)}"
-            )
+            raise ConfigError(f"notifications.min_severity must be one of {sorted(allowed)}")
         self.min_severity = self.min_severity.lower()
 
 
@@ -163,6 +159,8 @@ class LoggingSection:
     """Application logging settings."""
 
     level: str = "INFO"
+    #: "text" for humans reading a console, "json" for log shippers and alerting.
+    format: str = "text"
     file: str = "logs/monitor.log"
     max_bytes: int = 5 * 1024 * 1024
     backup_count: int = 3
@@ -173,6 +171,9 @@ class LoggingSection:
         valid = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}
         if self.level not in valid:
             raise ConfigError(f"logging.level must be one of {sorted(valid)}")
+        self.format = self.format.lower()
+        if self.format not in {"text", "json"}:
+            raise ConfigError("logging.format must be 'text' or 'json'")
 
 
 @dataclass
@@ -200,9 +201,7 @@ def _assign_section(section_cls: Type[T], values: Mapping[str, Any], name: str) 
     known = {f.name for f in fields(section_cls)}  # type: ignore[arg-type]
     unknown = set(values) - known
     if unknown:
-        raise ConfigError(
-            f"unknown option(s) in '{name}': {', '.join(sorted(unknown))}"
-        )
+        raise ConfigError(f"unknown option(s) in '{name}': {', '.join(sorted(unknown))}")
 
     kwargs: Dict[str, Any] = {}
     for key, value in values.items():

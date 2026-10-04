@@ -75,6 +75,9 @@ notifications:
 
 logging:
   level: INFO
+  # text = human readable console lines; json = one JSON object per line, for log
+  # shippers, SIEM ingestion and scripted alerting.
+  format: text
   file: logs/monitor.log
   max_bytes: 5242880
   backup_count: 3

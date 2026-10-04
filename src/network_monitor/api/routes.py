@@ -17,10 +17,13 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from ..models.events import EventSeverity, EventStatus, EventType
 from ..models.network import from_iso, utc_now
+from .metrics import CONTENT_TYPE as METRICS_CONTENT_TYPE
+from .metrics import render_metrics
 from .state import MonitorState
 
 logger = logging.getLogger(__name__)
@@ -73,7 +76,37 @@ def get_status(request: Request) -> Dict[str, Any]:
 
 @router.get("/health", summary="Liveness probe")
 def health() -> Dict[str, str]:
+    """Process-level liveness: is the API answering at all.
+
+    Deliberately shallow - a liveness probe that fails when a collector hiccups
+    would restart a healthy monitor. Use ``/api/ready`` for depth.
+    """
     return {"status": "ok"}
+
+
+@router.get("/ready", summary="Readiness probe")
+def ready(request: Request) -> JSONResponse:
+    """Deep readiness: database writable, loop fresh, notifier alive."""
+    state = get_state(request)
+    is_ready, checks = state.readiness()
+    payload = {
+        "ready": is_ready,
+        "checks": checks,
+        "cycles": state.cycle_count,
+        "last_cycle_at": state.last_cycle_at.isoformat() if state.last_cycle_at else None,
+    }
+    return JSONResponse(status_code=200 if is_ready else 503, content=payload)
+
+
+@router.get(
+    "/metrics",
+    summary="Prometheus metrics",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/plain": {}}}},
+)
+def metrics(request: Request) -> PlainTextResponse:
+    """Metrics in the Prometheus text exposition format."""
+    return PlainTextResponse(render_metrics(get_state(request)), media_type=METRICS_CONTENT_TYPE)
 
 
 # ----------------------------------------------------------------------
@@ -157,8 +190,12 @@ def get_traffic_history(
     end = parse_datetime_param(to, "to")
     points = state.traffic_history(start=start, end=end, interface=interface, limit=limit)
     return {
-        "from": (start or points[0].timestamp if points else start).isoformat() if (start or points) else None,
-        "to": (end or points[-1].timestamp if points else end).isoformat() if (end or points) else None,
+        "from": (start or points[0].timestamp if points else start).isoformat()
+        if (start or points)
+        else None,
+        "to": (end or points[-1].timestamp if points else end).isoformat()
+        if (end or points)
+        else None,
         "interface": interface,
         "count": len(points),
         "points": [point.to_dict() for point in points],
@@ -184,7 +221,11 @@ def get_connections(
         connections = [
             c
             for c in connections
-            if (not process or (c.process_name or "").lower().find(process.lower()) >= 0 or f"pid {c.pid}".find(process.lower()) >= 0)
+            if (
+                not process
+                or (c.process_name or "").lower().find(process.lower()) >= 0
+                or f"pid {c.pid}".find(process.lower()) >= 0
+            )
             and (pid is None or c.pid == pid)
             and (not state_filter or c.state.upper() == state_filter.upper())
             and (
@@ -240,7 +281,9 @@ def get_processes(
                 "pid": pid,
                 "name": stored.name if stored else None,
                 "executable": stored.executable if stored else None,
-                "created_at": stored.created_at.isoformat() if stored and stored.created_at else None,
+                "created_at": stored.created_at.isoformat()
+                if stored and stored.created_at
+                else None,
                 "last_seen": stored.last_seen.isoformat() if stored and stored.last_seen else None,
                 "error": None if stored else "unresolved",
                 "resolved": bool(stored),
@@ -332,7 +375,9 @@ class EventStatusUpdate(BaseModel):
 
 
 @router.patch("/events/{event_id}", summary="Update the status of an event")
-def update_event_status(request: Request, event_id: int, update: EventStatusUpdate) -> Dict[str, Any]:
+def update_event_status(
+    request: Request, event_id: int, update: EventStatusUpdate
+) -> Dict[str, Any]:
     repository = get_state(request).events
     if not repository.update_status(event_id, update.status):
         raise HTTPException(status_code=404, detail=f"event {event_id} not found")

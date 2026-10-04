@@ -62,7 +62,11 @@ class MonitorState:
     started_at: datetime = field(default_factory=utc_now)
     last_cycle_at: Optional[datetime] = None
     last_cycle_duration_ms: Optional[float] = None
+    max_cycle_duration_ms: Optional[float] = None
     cycle_count: int = 0
+    #: Cycles that recorded at least one collector/storage error - the SLO
+    #: "collection success ratio" is derived from cycle_count and this value.
+    failed_cycles: int = 0
     #: Latest in-memory snapshot (falls back to the database when empty).
     latest_measurements: List[InterfaceMeasurement] = field(default_factory=list)
     latest_connections: List[NetworkConnection] = field(default_factory=list)
@@ -87,7 +91,11 @@ class MonitorState:
             self.latest_processes = list(processes)
             self.last_cycle_at = timestamp
             self.last_cycle_duration_ms = duration_ms
+            if self.max_cycle_duration_ms is None or duration_ms > self.max_cycle_duration_ms:
+                self.max_cycle_duration_ms = duration_ms
             self.cycle_count += 1
+            if errors:
+                self.failed_cycles += 1
             self.last_errors = list(errors)[-10:]
 
     def set_interface_info(self, info: Sequence[InterfaceInfo]) -> None:
@@ -176,14 +184,56 @@ class MonitorState:
     def uptime_seconds(self) -> float:
         return max(0.0, (utc_now() - self.started_at).total_seconds())
 
+    def collection_success_ratio(self) -> Optional[float]:
+        """Fraction of cycles without collector/storage errors (``None`` = no data).
+
+        This is the primary SLI of the monitor itself: see docs/SLO.md.
+        """
+        if self.cycle_count == 0:
+            return None
+        return (self.cycle_count - self.failed_cycles) / self.cycle_count
+
+    def readiness(self) -> tuple[bool, Dict[str, bool]]:
+        """Readiness probe used by ``/api/ready``.
+
+        Deliberately stricter than liveness: an API that answers while the
+        database is unwritable or the loop has stalled is *not* ready to serve
+        trustworthy data. Checks are returned individually so a failure can be
+        diagnosed from one response.
+        """
+        checks: Dict[str, bool] = {}
+        checks["database"] = self.database.is_writable()
+
+        if self.has_live_data:
+            tolerance = max(5.0, self.config.monitor.collection_interval * 3)
+            age = (utc_now() - self.last_cycle_at).total_seconds() if self.last_cycle_at else None
+            checks["collection_loop"] = age is not None and age <= tolerance
+            # Serving a snapshot assembled from failed collectors is not being
+            # ready to serve trustworthy data, so the last cycle must be clean.
+            checks["collection_errors"] = not self.last_errors
+        else:
+            # API-only mode: nothing to collect in this process.
+            checks["collection_loop"] = True
+            checks["collection_errors"] = True
+
+        if self.notifications is not None and self.config.notifications.enabled:
+            checks["notifications"] = bool(self.notifications.status().get("worker_running"))
+        else:
+            checks["notifications"] = True
+
+        return all(checks.values()), checks
+
     def status_payload(self) -> Dict[str, Any]:
         """Body of ``GET /api/status``."""
         states = self.health.states()
-        overall = "running"
-        if any(state == "failed" for state in states.values()):
+        if any(state == "failed" for state in states.values()) or self.last_errors:
+            # A degraded feature must be visible in the headline status, not
+            # only in the per-collector detail below.
             overall = "degraded"
-        elif not states:
+        elif not states and self.cycle_count == 0:
             overall = "starting"
+        else:
+            overall = "running"
 
         return {
             "status": overall,
@@ -192,10 +242,20 @@ class MonitorState:
             "started_at": self.started_at.isoformat(),
             "collection_interval_seconds": self.config.monitor.collection_interval,
             "cycles": self.cycle_count,
+            "failed_cycles": self.failed_cycles,
+            "collection_success_ratio": (
+                round(self.collection_success_ratio(), 4)
+                if self.collection_success_ratio() is not None
+                else None
+            ),
             "last_cycle_at": self.last_cycle_at.isoformat() if self.last_cycle_at else None,
             "last_cycle_duration_ms": round(self.last_cycle_duration_ms, 2)
             if self.last_cycle_duration_ms is not None
             else None,
+            "max_cycle_duration_ms": round(self.max_cycle_duration_ms, 2)
+            if self.max_cycle_duration_ms is not None
+            else None,
+            "ready": self.readiness()[0],
             "collectors": {name: status.to_dict() for name, status in self.health.statuses.items()},
             "collector_states": states,
             "detection": {
@@ -203,7 +263,9 @@ class MonitorState:
                 "baseline_connections": round(self.detection.baseline, 2),
                 "known_processes": len(self.detection.seen_pids),
             },
-            "notifications": self.notifications.status() if self.notifications else {"enabled": False},
+            "notifications": self.notifications.status()
+            if self.notifications
+            else {"enabled": False},
             "storage": {
                 "database": str(self.database.path),
                 **self.database.table_counts(),
