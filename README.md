@@ -190,7 +190,11 @@ Design system and interaction patterns:
 Structure and copy are protected by `tests/test_dashboard.py`: every element the
 script queries must exist, tables must keep captions and scoped headers, no
 remote resource may creep in, and the tokens, states and reduced-motion rules
-must stay defined.
+must stay defined. The full design rationale — story order, token set, states and
+the accessibility commitments — lives in
+[docs/DASHBOARD.md](docs/DASHBOARD.md), and the rendering paths are exercised
+against a live monitor by `scripts/dashboard-render-check.js` (jsdom), which CI
+runs on every pull request.
 
 ## 6. API
 

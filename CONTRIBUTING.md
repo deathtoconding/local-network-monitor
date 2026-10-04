@@ -126,6 +126,33 @@ Windows + Linux, Python 3.11 + 3.12.
 
 ---
 
+### Changing the dashboard
+
+The dashboard is plain HTML/CSS/JS with no build step, so there is no compiler to
+catch a script that queries an element the markup does not contain. Two tools
+stand in for that:
+
+```bash
+python -m pytest tests/test_dashboard.py -q     # structural contract, runs in CI
+
+python -m network_monitor --host 127.0.0.1 --port 8000 &
+npm install --no-save jsdom                     # development-only, not a runtime dep
+node scripts/dashboard-render-check.js          # renders the real page against live data
+```
+
+`tests/test_dashboard.py` asserts the HTML/JS element contract, the offline
+invariant (no CDN, no remote fonts, relative API paths), table captions and scoped
+headers, the token set, the loading/empty/error states, and the story order. If a
+change reorders the page, update `STORY_SECTIONS` in that test deliberately.
+
+`scripts/dashboard-render-check.js` loads the real page in jsdom, stubs the
+canvas, feeds it payloads from a running monitor and checks what a person would
+see — verdict, attention rows, process ranking, tables, the evidence dialog and
+the theme toggle. It runs in CI as the `dashboard` job. Keep the design document
+[docs/DASHBOARD.md](docs/DASHBOARD.md) and `CHANGELOG.md` in step with any
+behavioural change: the design rules are part of the deliverable, not commentary
+on it.
+
 ## 6. Definition of Done
 
 A pull request is ready when:

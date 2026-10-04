@@ -8,6 +8,7 @@ Start here depending on what you are doing.
 | Understand **why** the system is shaped this way | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Know what was specified and what was actually built | [SPECIFICATION.md](SPECIFICATION.md) |
 | Know what "healthy" means numerically | [SLO.md](SLO.md) |
+| Understand the dashboard's design and copy | [DASHBOARD.md](DASHBOARD.md) |
 | Fix something that is broken right now | [RUNBOOK.md](RUNBOOK.md) |
 | See what is coming next and how work is managed | [PLAN.md](PLAN.md) |
 | Know why a decision was made | [adr/](adr/README.md) |
@@ -22,7 +23,8 @@ SPECIFICATION ──► what must exist (and the MVP boundary)
       │
       ├──► ARCHITECTURE ──► how it is built, and where failure lands
       │          │
-      │          └──► adr/ ──► why each expensive decision was taken
+      │          ├──► adr/ ─────► why each expensive decision was taken
+      │          └──► DASHBOARD ► how the UI tells the story, and the rules it obeys
       │
       ├──► SLO ──────────► what healthy means, with targets and error budget
       │          │
