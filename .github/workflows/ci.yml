@@ -97,7 +97,7 @@ jobs:
           gh pr comment "$PR_NUMBER" --body-file failure-report.md --edit-last --create-if-none
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-xml
           path: coverage.xml
@@ -250,7 +250,7 @@ jobs:
           curl -sf http://127.0.0.1:8123/api/metrics | grep -q lnm_up
           curl -sf http://127.0.0.1:8123/ | grep -q "Local Network Monitor"
           curl -sf http://127.0.0.1:8123/static/js/app.js >/dev/null
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
